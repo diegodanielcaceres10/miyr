@@ -1,0 +1,10 @@
+{
+  "name": "miyr",
+  "version": "0.1.0",
+  "description": "Reusable audit checks and AI prompts to keep personal projects consistent, secure and well-tested.",
+  "type": "module",
+  "bin": { "miyr": "bin/miyr.mjs" },
+  "scripts": { "test": "node --test" },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}
