@@ -1,7 +1,8 @@
 import { findFile, readText } from '../../lib/files.mjs';
 
-export const id = 'core/readme';
+export const id = 'docs/readme';
 export const title = 'README con secciones obligatorias';
+export const profile = 'core';
 
 // Headings are matched by stem so both Spanish and English titles are accepted.
 const SECTIONS = [

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { run } from '../../../src/audits/core/editorconfig.mjs';
+import { run } from '../../../src/audits/config/editorconfig.mjs';
 import { EDITORCONFIG, project } from '../../../test-support/project.mjs';
 
 test('fails when .editorconfig is missing', () => {

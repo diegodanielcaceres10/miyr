@@ -1,8 +1,9 @@
 import path from 'node:path';
 import { findFile, readText } from '../../lib/files.mjs';
 
-export const id = 'core/editorconfig';
+export const id = 'config/editorconfig';
 export const title = '.editorconfig definido';
+export const profile = 'core';
 
 // Keys that must be set in the global [*] section.
 const REQUIRED_KEYS = ['indent_style', 'indent_size', 'end_of_line', 'charset', 'insert_final_newline'];

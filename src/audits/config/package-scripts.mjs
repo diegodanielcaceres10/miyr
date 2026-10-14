@@ -1,24 +1,14 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { readJson } from '../../lib/files.mjs';
+import { loadPackage } from '../../lib/package-json.mjs';
 
-export const id = 'core/package-scripts';
+export const id = 'config/package-scripts';
 export const title = 'Scripts estándar en package.json';
+export const profile = 'node';
 
 const REQUIRED = ['start', 'build', 'test', 'lint'];
 
 export function run({ cwd }) {
-  const file = path.join(cwd, 'package.json');
-  if (!fs.existsSync(file)) {
-    return { id, title, status: 'fail', severity: 'high', message: 'No existe package.json en la raíz.' };
-  }
-
-  let pkg;
-  try {
-    pkg = readJson(file);
-  } catch (err) {
-    return { id, title, status: 'error', severity: 'high', message: `package.json inválido: ${err.message}` };
-  }
+  const { pkg, failure } = loadPackage(cwd);
+  if (failure) return { id, title, severity: 'high', ...failure };
 
   const scripts = pkg.scripts ?? {};
   const missing = REQUIRED.filter((name) => typeof scripts[name] !== 'string' || scripts[name].trim() === '');

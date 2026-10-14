@@ -21,3 +21,5 @@ export const readText = (file) => fs.readFileSync(file, 'utf8');
 
 /** Reads strict JSON; tolerates the UTF-8 BOM that some Windows editors add. */
 export const readJson = (file) => JSON.parse(readText(file).replace(/^\uFEFF/, ''));
+
+export const LICENSE_FILES = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'LICENCE', 'LICENCE.md', 'LICENCE.txt', 'COPYING'];

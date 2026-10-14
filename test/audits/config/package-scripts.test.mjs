@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { run } from '../../../src/audits/core/package-scripts.mjs';
+import { run } from '../../../src/audits/config/package-scripts.mjs';
 import { project } from '../../../test-support/project.mjs';
 
 const ALL = { start: 'ng serve', build: 'ng build', test: 'ng test', lint: 'ng lint' };

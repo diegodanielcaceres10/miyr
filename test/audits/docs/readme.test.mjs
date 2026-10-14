@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { run } from '../../../src/audits/core/readme.mjs';
+import { run } from '../../../src/audits/docs/readme.mjs';
 import { README, project } from '../../../test-support/project.mjs';
 
 test('fails when README is missing', () => {

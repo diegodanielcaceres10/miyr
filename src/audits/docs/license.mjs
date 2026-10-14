@@ -1,13 +1,12 @@
 import path from 'node:path';
-import { findFile, readText } from '../../lib/files.mjs';
+import { LICENSE_FILES, findFile, readText } from '../../lib/files.mjs';
 
-export const id = 'core/license';
+export const id = 'docs/license';
 export const title = 'LICENSE presente';
-
-const NAMES = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'LICENCE', 'LICENCE.md', 'LICENCE.txt', 'COPYING'];
+export const profile = 'core';
 
 export function run({ cwd }) {
-  const file = findFile(cwd, NAMES);
+  const file = findFile(cwd, LICENSE_FILES);
   if (!file) {
     return {
       id, title, status: 'fail', severity: 'medium',

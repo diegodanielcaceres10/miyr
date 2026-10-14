@@ -46,13 +46,33 @@ jobs:
       - run: npm run build
 `;
 
-/** A project that satisfies every core and Angular check; \`overrides\` replaces entries, null removes them. */
+export const MIT = `MIT License
+
+Copyright (c) 2026
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction.
+`;
+
+/** A project that satisfies every check of the angular profile; `overrides` replaces entries, null removes them. */
 export function completeProject(overrides = {}) {
   const files = {
-    'package.json': { scripts: { start: 'ng serve', build: 'ng build', test: 'ng test', lint: 'ng lint' } },
+    'package.json': {
+      name: 'app',
+      version: '0.0.0',
+      private: true,
+      license: 'MIT',
+      engines: { node: '>=20' },
+      packageManager: 'npm@10.9.0',
+      scripts: { start: 'ng serve', build: 'ng build', test: 'ng test', lint: 'ng lint' },
+    },
+    '.nvmrc': '22\n',
+    'package-lock.json': '{}',
+    '.gitignore': 'node_modules\ndist\n.angular\n',
     '.editorconfig': EDITORCONFIG,
     'README.md': README,
-    LICENSE: 'MIT License\n\nCopyright (c) 2026\n',
+    LICENSE: MIT,
     '.github/workflows/ci.yml': WORKFLOW,
     'tsconfig.json': { compilerOptions: { strict: true } },
   };

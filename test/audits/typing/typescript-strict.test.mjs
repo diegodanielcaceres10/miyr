@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { run } from '../../../src/audits/angular/typescript-strict.mjs';
+import { run } from '../../../src/audits/typing/typescript-strict.mjs';
 
 // Creates a throwaway project directory from a { filename: content } map.
 function project(files) {

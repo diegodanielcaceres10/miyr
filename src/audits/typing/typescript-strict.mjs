@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { effectiveOptions, loadTsconfigChain } from '../../lib/tsconfig.mjs';
 
-export const id = 'angular/typescript-strict';
+export const id = 'typing/typescript-strict';
 export const title = 'TypeScript strict mode habilitado';
+export const profile = 'angular';
 
 // Flags enabled by `strict: true` (each one can be overridden individually).
 const STRICT_FAMILY = [

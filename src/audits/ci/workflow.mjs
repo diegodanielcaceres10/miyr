@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readText } from '../../lib/files.mjs';
 
-export const id = 'core/ci-workflow';
+export const id = 'ci/workflow';
 export const title = 'Workflow de CI con lint, test y build';
+export const profile = 'node';
 
 const PM = String.raw`(?:npm|pnpm|yarn|bun)`;
 const STEPS = {

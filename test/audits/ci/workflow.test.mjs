@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { run } from '../../../src/audits/core/ci-workflow.mjs';
+import { run } from '../../../src/audits/ci/workflow.mjs';
 import { WORKFLOW, project } from '../../../test-support/project.mjs';
 
 const ci = (files) => run({ cwd: project(files) });
