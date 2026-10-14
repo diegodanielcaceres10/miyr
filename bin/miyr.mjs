@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import path from 'node:path';
-import { runAngularAudit } from '../src/audits/angular/index.mjs';
+import { profiles, runAudit } from '../src/audits/index.mjs';
 
 const args = process.argv.slice(2);
 const [command, profile] = args;
@@ -10,13 +10,13 @@ const option = (name) => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 
-if (command !== 'audit' || profile !== 'angular') {
-  console.error('Uso: miyr audit angular [--cwd <ruta>] [--json]');
+if (command !== 'audit' || !Object.hasOwn(profiles, profile)) {
+  console.error(`Uso: miyr audit <perfil> [--cwd <ruta>] [--json]\nPerfiles: ${Object.keys(profiles).join(', ')}`);
   process.exit(2);
 }
 
 const cwd = path.resolve(option('cwd') ?? process.cwd());
-const results = runAngularAudit({ cwd });
+const results = runAudit(profile, { cwd });
 
 if (flag('json')) {
   console.log(JSON.stringify({ profile, cwd, results }, null, 2));

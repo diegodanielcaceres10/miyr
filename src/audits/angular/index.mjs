@@ -1,8 +1,4 @@
 import * as typescriptStrict from './typescript-strict.mjs';
 
-// Register every new Angular check here.
+// Angular-specific checks. Register new ones here.
 export const checks = [typescriptStrict];
-
-export function runAngularAudit(ctx) {
-  return checks.map((check) => check.run(ctx));
-}
