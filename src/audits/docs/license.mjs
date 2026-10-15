@@ -1,16 +1,17 @@
 import path from 'node:path';
-import { LICENSE_FILES, findFile, readText } from '../../lib/files.mjs';
+import { findUp } from '../../lib/context.mjs';
+import { LICENSE_FILES, readText } from '../../lib/files.mjs';
 
 export const id = 'docs/license';
 export const title = 'LICENSE presente';
 export const profile = 'core';
 
-export function run({ cwd }) {
-  const file = findFile(cwd, LICENSE_FILES);
+export function run(ctx) {
+  const file = findUp(ctx, LICENSE_FILES);
   if (!file) {
     return {
       id, title, status: 'fail', severity: 'medium',
-      message: 'No existe un archivo LICENSE.',
+      message: 'No se encontró un archivo LICENSE (ni en el proyecto ni en las carpetas hasta la raíz del repo).',
       fix: 'Añade un archivo LICENSE con la licencia elegida.',
     };
   }

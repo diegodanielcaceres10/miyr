@@ -3,11 +3,39 @@ Reusable AI audit prompts and commands to keep personal projects consistent, sec
 
 ## Usage
 
+Two ways to say which project to audit. Neither guesses anything: the folder and the profile are always explicit.
+
 ```bash
+# 1. In the command: one folder, one profile
 node bin/miyr.mjs audit <profile> [--cwd <path>] [--json]
+
+# 2. In the manifest (.miyr.json at the repository root): every project listed there
+node bin/miyr.mjs audit [--project <name>] [--cwd <path>] [--json]
 ```
 
-Profiles extend each other: `core` < `node` < `angular`. Exit code `0` when every check passes, `1` when any check fails, `2` on invalid usage. Run `npm test` to execute the test suite.
+Profiles extend each other: `core` < `node` < `angular`. Exit code `0` when every check passes, `1` when any check fails, `2` on invalid usage or an invalid manifest. Run `npm test` to execute the test suite.
+
+The repository root is the nearest folder with `.git`, looking upwards from `--cwd` (or from the current folder). Project files (`package.json`, lockfile, `tsconfig.json`) are read from the project folder. Repository-level files are searched from the project folder up to the repository root, nearest first: `README`, `LICENSE`, `.editorconfig`, `.nvmrc`, and every `.gitignore` in the chain. Workflows are only read from `<root>/.github/workflows`, as GitHub does.
+
+The text output has one block per project with a `Resumen` line, so you can copy it as is. `--json` prints `{ root, projects: [{ name, path, profile, results }] }`.
+
+## Project manifest
+
+`.miyr.json` only says where each project lives and which profile applies. It cannot change rules.
+
+```json
+{
+  "projects": [
+    { "name": "web", "path": "web", "profile": "angular" },
+    { "name": "landing", "path": "landing", "profile": "node" }
+  ]
+}
+```
+
+- `path` is relative to the repository root (`"."` is the root itself) and must be an existing folder inside the repository.
+- `profile` is one of the available profiles.
+- `name` is optional (defaults to the path) and is what `--project` receives. Names and folders must be unique.
+- Unknown keys are rejected, so a typo does not go unnoticed.
 
 ## Checks
 

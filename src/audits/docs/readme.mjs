@@ -1,4 +1,5 @@
-import { findFile, readText } from '../../lib/files.mjs';
+import { findUp } from '../../lib/context.mjs';
+import { readText } from '../../lib/files.mjs';
 
 export const id = 'docs/readme';
 export const title = 'README con secciones obligatorias';
@@ -30,9 +31,11 @@ function headings(text) {
   return found;
 }
 
-export function run({ cwd }) {
-  const file = findFile(cwd, ['README.md', 'README']);
-  if (!file) return { id, title, status: 'fail', severity: 'medium', message: 'No existe README.md en la raíz.' };
+export function run(ctx) {
+  const file = findUp(ctx, ['README.md', 'README']);
+  if (!file) {
+    return { id, title, status: 'fail', severity: 'medium', message: 'No se encontró README.md (ni en el proyecto ni en las carpetas hasta la raíz del repo).' };
+  }
 
   const text = readText(file);
   if (text.trim() === '') return { id, title, status: 'fail', severity: 'medium', message: 'El README está vacío.' };

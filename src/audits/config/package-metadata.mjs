@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { LICENSE_FILES, findFile, readText } from '../../lib/files.mjs';
+import { findUp } from '../../lib/context.mjs';
+import { LICENSE_FILES, readText } from '../../lib/files.mjs';
 import { loadPackage } from '../../lib/package-json.mjs';
 
 export const id = 'config/package-metadata';
@@ -22,8 +23,8 @@ const SIGNATURES = {
 const SEMVER = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*$/;
 const PUBLISHABLE_KEYS = ['main', 'module', 'exports', 'bin', 'types'];
 
-export function run({ cwd }) {
-  const { pkg, failure } = loadPackage(cwd);
+export function run(ctx) {
+  const { pkg, failure } = loadPackage(ctx.cwd);
   if (failure) return { id, title, severity: 'medium', ...failure };
 
   const problems = [];
@@ -37,7 +38,7 @@ export function run({ cwd }) {
   } else {
     const spdx = pkg.license.trim().replace(/-(?:only|or-later)$/, '').replace(/\+$/, '');
     const signature = SIGNATURES[spdx];
-    const file = findFile(cwd, LICENSE_FILES);
+    const file = findUp(ctx, LICENSE_FILES);
     if (signature && file && !signature.test(readText(file))) {
       problems.push(`license "${pkg.license}" no coincide con ${path.basename(file)}`);
     }

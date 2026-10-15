@@ -1,25 +1,74 @@
-function toRegex(pattern) {
-  const body = pattern.replace(/\/+$/, '').replace(/^\*\*\//, '').replace(/^\//, '');
-  const source = body
+import fs from 'node:fs';
+import path from 'node:path';
+import { ancestors } from './context.mjs';
+import { readText } from './files.mjs';
+
+function globSource(body) {
+  return body
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
     .replace(/\*\*/g, '\u0000')
     .replace(/\*/g, '[^/]*')
     .replace(/\?/g, '[^/]')
     .replace(/\u0000/g, '.*');
-  return new RegExp(`^${source}$`);
 }
 
-/**
- * True when a top-level file or directory is ignored by the given .gitignore text.
- * Basic glob support and negations; global or nested ignore files are not considered.
- */
-export function isIgnored(text, name) {
-  let ignored = false;
+function parseRules(text) {
+  const rules = [];
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
     const negated = line.startsWith('!');
-    if (toRegex(negated ? line.slice(1) : line).test(name)) ignored = !negated;
+    let body = (negated ? line.slice(1) : line).replace(/\/+$/, '');
+    if (!body) continue;
+    const deep = body.startsWith('**/');
+    if (deep) body = body.slice(3);
+    // Like git: a slash at the start or in the middle anchors the pattern to the .gitignore folder.
+    const anchored = !deep && body.includes('/');
+    const byPath = anchored || (deep && body.includes('/'));
+    const source = globSource(body.replace(/^\//, ''));
+    rules.push({ negated, byPath, regex: new RegExp(deep && byPath ? `^(?:.*/)?${source}$` : `^${source}$`) });
   }
-  return ignored;
+  return rules;
+}
+
+/**
+ * Result of one .gitignore for a path relative to its folder (posix separators):
+ * true = ignored, false = re-included by a negation, null = no rule matched.
+ * Basic glob support; a path below an ignored directory is always ignored.
+ */
+export function ignoreState(text, relPath) {
+  const rules = parseRules(text);
+  const segments = relPath.split('/').filter(Boolean);
+  let state = null;
+  for (let i = 1; i <= segments.length; i++) {
+    const full = segments.slice(0, i).join('/');
+    const name = segments[i - 1];
+    state = null;
+    for (const rule of rules) {
+      if (rule.regex.test(rule.byPath ? full : name)) state = !rule.negated;
+    }
+    if (state === true && i < segments.length) return true;
+  }
+  return state;
+}
+
+export const isIgnored = (text, relPath) => ignoreState(text, relPath) === true;
+
+/** Existing .gitignore files from the repository root down to the project folder. */
+export function gitignoreFiles(ctx) {
+  return ancestors(ctx)
+    .reverse()
+    .map((dir) => path.join(dir, '.gitignore'))
+    .filter((file) => fs.existsSync(file));
+}
+
+/** Whether `name`, a file or folder inside the project, is ignored by the .gitignore chain (deeper files win). */
+export function isIgnoredInRepo(ctx, name) {
+  let state = null;
+  for (const file of gitignoreFiles(ctx)) {
+    const rel = path.relative(path.dirname(file), path.join(ctx.cwd, name)).split(path.sep).join('/');
+    const result = ignoreState(readText(file), rel);
+    if (result !== null) state = result;
+  }
+  return state === true;
 }

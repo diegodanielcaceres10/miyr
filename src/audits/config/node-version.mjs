@@ -1,17 +1,18 @@
-import { findFile, readText } from '../../lib/files.mjs';
+import { findUp } from '../../lib/context.mjs';
+import { readText } from '../../lib/files.mjs';
 import { loadPackage } from '../../lib/package-json.mjs';
 
 export const id = 'config/node-version';
 export const title = 'Versión de Node y gestor de paquetes fijados';
 export const profile = 'node';
 
-export function run({ cwd }) {
-  const { pkg, failure } = loadPackage(cwd);
+export function run(ctx) {
+  const { pkg, failure } = loadPackage(ctx.cwd);
   if (failure) return { id, title, severity: 'medium', ...failure };
 
   const missing = [];
   if (typeof pkg.engines?.node !== 'string' || pkg.engines.node.trim() === '') missing.push('engines.node');
-  const versionFile = findFile(cwd, ['.nvmrc', '.node-version']);
+  const versionFile = findUp(ctx, ['.nvmrc', '.node-version']);
   if (!versionFile || readText(versionFile).trim() === '') missing.push('.nvmrc o .node-version');
   if (!/^(npm|yarn|pnpm|bun)@\d/.test(String(pkg.packageManager ?? ''))) {
     missing.push('packageManager (por ejemplo npm@10.9.0)');

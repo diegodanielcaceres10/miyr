@@ -1,16 +1,18 @@
-import { findFile, readText } from '../../lib/files.mjs';
-import { isIgnored } from '../../lib/gitignore.mjs';
+import { gitignoreFiles, isIgnoredInRepo } from '../../lib/gitignore.mjs';
 
 export const id = 'config/gitignore';
 export const title = '.gitignore excluye node_modules';
 export const profile = 'node';
 
-export function run({ cwd }) {
-  const file = findFile(cwd, ['.gitignore']);
-  if (!file) {
-    return { id, title, status: 'fail', severity: 'high', message: 'No existe .gitignore en la raíz.', fix: 'Crea un .gitignore que excluya node_modules.' };
+export function run(ctx) {
+  if (gitignoreFiles(ctx).length === 0) {
+    return {
+      id, title, status: 'fail', severity: 'high',
+      message: 'No se encontró ningún .gitignore (ni en el proyecto ni en las carpetas hasta la raíz del repo).',
+      fix: 'Crea un .gitignore que excluya node_modules.',
+    };
   }
-  if (!isIgnored(readText(file), 'node_modules')) {
+  if (!isIgnoredInRepo(ctx, 'node_modules')) {
     return { id, title, status: 'fail', severity: 'high', message: '.gitignore no excluye node_modules.', fix: 'Añade "node_modules" a .gitignore.' };
   }
   return { id, title, status: 'pass', severity: 'high', message: 'node_modules ignorado.' };

@@ -52,13 +52,14 @@ function runCommands(lines) {
   return commands;
 }
 
-export function run({ cwd }) {
-  const dir = path.join(cwd, '.github', 'workflows');
+// GitHub only reads workflows from the repository root, so that is the only place checked.
+export function run({ cwd, root = cwd }) {
+  const dir = path.join(root, '.github', 'workflows');
   const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.ya?ml$/i.test(f)) : [];
   if (files.length === 0) {
     return {
       id, title, status: 'fail', severity: 'high',
-      message: 'No hay workflows en .github/workflows.',
+      message: 'No hay workflows en .github/workflows de la raíz del repo.',
       fix: 'Crea un workflow que se ejecute en push o pull_request y corra lint, test y build.',
     };
   }

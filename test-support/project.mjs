@@ -55,9 +55,9 @@ of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction.
 `;
 
-/** A project that satisfies every check of the angular profile; `overrides` replaces entries, null removes them. */
-export function completeProject(overrides = {}) {
-  const files = {
+function defaultFiles() {
+  return {
+    '.git/HEAD': 'ref: refs/heads/main\n',
     'package.json': {
       name: 'app',
       version: '0.0.0',
@@ -76,9 +76,37 @@ export function completeProject(overrides = {}) {
     '.github/workflows/ci.yml': WORKFLOW,
     'tsconfig.json': { compilerOptions: { strict: true } },
   };
+}
+
+function withOverrides(files, overrides) {
   for (const [name, content] of Object.entries(overrides)) {
     if (content === null) delete files[name];
     else files[name] = content;
   }
-  return project(files);
+  return files;
+}
+
+/** A repository whose root is also the project and which satisfies every angular check; null removes an entry. */
+export function completeProject(overrides = {}) {
+  return project(withOverrides(defaultFiles(), overrides));
+}
+
+// Files that belong to the project folder; everything else lives at the repository root.
+const PROJECT_LEVEL = ['package.json', '.nvmrc', 'package-lock.json', 'tsconfig.json'];
+
+/** Project-level files of a node project (no tsconfig) placed under `dir`. */
+export function nodeProjectFiles(dir) {
+  const files = defaultFiles();
+  return Object.fromEntries(
+    PROJECT_LEVEL.filter((name) => name !== 'tsconfig.json').map((name) => [`${dir}/${name}`, files[name]]),
+  );
+}
+
+/** A repository whose Angular project lives in `web/`. Override paths are relative to the repository root. */
+export function completeRepo(overrides = {}) {
+  const files = {};
+  for (const [name, content] of Object.entries(defaultFiles())) {
+    files[PROJECT_LEVEL.includes(name) ? `web/${name}` : name] = content;
+  }
+  return project(withOverrides(files, overrides));
 }

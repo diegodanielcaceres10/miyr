@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { findFile, readText } from '../../lib/files.mjs';
-import { isIgnored } from '../../lib/gitignore.mjs';
+import { isIgnoredInRepo } from '../../lib/gitignore.mjs';
 import { loadPackage } from '../../lib/package-json.mjs';
 
 export const id = 'config/lockfile';
@@ -18,7 +17,8 @@ const LOCKFILES = {
 
 const fail = (message, fix, evidence) => ({ id, title, status: 'fail', severity: 'high', message, fix, evidence });
 
-export function run({ cwd }) {
+export function run(ctx) {
+  const { cwd } = ctx;
   const present = Object.keys(LOCKFILES).filter((name) => fs.existsSync(path.join(cwd, name)));
   if (present.length === 0) {
     return fail('No hay lockfile (package-lock.json, yarn.lock, pnpm-lock.yaml o bun.lock).', 'Instala las dependencias y versiona el lockfile generado.');
@@ -29,9 +29,7 @@ export function run({ cwd }) {
     return fail(`Conviven lockfiles de gestores distintos: ${present.join(', ')}.`, 'Conserva solo el del gestor que uses.', { present });
   }
 
-  const gitignore = findFile(cwd, ['.gitignore']);
-  const text = gitignore ? readText(gitignore) : '';
-  const ignored = present.filter((name) => isIgnored(text, name));
+  const ignored = present.filter((name) => isIgnoredInRepo(ctx, name));
   if (ignored.length > 0) {
     return fail(`El lockfile está ignorado en .gitignore: ${ignored.join(', ')}.`, 'Quita esa regla de .gitignore para versionar el lockfile.', { ignored });
   }

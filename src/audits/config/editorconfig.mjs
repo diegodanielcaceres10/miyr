@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { findFile, readText } from '../../lib/files.mjs';
+import { findUp } from '../../lib/context.mjs';
+import { readText } from '../../lib/files.mjs';
 
 export const id = 'config/editorconfig';
 export const title = '.editorconfig definido';
@@ -26,10 +27,10 @@ function parse(text) {
   return { root, sections };
 }
 
-export function run({ cwd }) {
-  const file = findFile(cwd, ['.editorconfig']);
+export function run(ctx) {
+  const file = findUp(ctx, ['.editorconfig']);
   if (!file) {
-    return { id, title, status: 'fail', severity: 'medium', message: 'No existe .editorconfig en la raíz.' };
+    return { id, title, status: 'fail', severity: 'medium', message: 'No se encontró .editorconfig (ni en el proyecto ni en las carpetas hasta la raíz del repo).' };
   }
 
   const { root, sections } = parse(readText(file));
@@ -41,7 +42,7 @@ export function run({ cwd }) {
 
   if (missing.length > 0) {
     return {
-      id, title, status: 'fail', severity: 'medium', evidence: { file: path.basename(file), missing },
+      id, title, status: 'fail', severity: 'medium', evidence: { file: path.relative(ctx.root ?? ctx.cwd, file), missing },
       message: `.editorconfig incompleto. Falta: ${missing.join(', ')}.`,
       fix: 'Declara "root = true" y esas claves en la sección [*].',
     };
