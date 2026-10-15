@@ -129,3 +129,60 @@ test('a manifest can point a project at the repository root', () => {
   const root = completeProject({ '.miyr.json': { projects: [{ path: '.', profile: 'angular' }] } });
   assert.equal(cli('audit', '--cwd', root).status, 0);
 });
+
+// --- output format
+
+const failingRepo = () => completeRepo({ LICENSE: null, 'web/.nvmrc': null });
+const audit = (...extra) => cli('audit', 'angular', '--cwd', path.join(failingRepo(), 'web'), ...extra);
+
+test('text output is grouped by area, with documentation apart from configuration', () => {
+  const { stdout } = audit();
+  for (const label of ['Configuración', 'Tipado', 'CI/CD', 'Documentación']) assert.match(stdout, new RegExp(`^${label}`, 'm'));
+  assert.ok(stdout.indexOf('Configuración') < stdout.indexOf('Documentación'));
+  const readme = stdout.indexOf('docs/readme');
+  assert.ok(readme > stdout.indexOf('Documentación'), 'docs/readme must be listed under Documentación');
+});
+
+test('text output shows the id of every check so it can be referenced', () => {
+  const { stdout } = audit();
+  assert.match(stdout, /\(config\/node-version\)/);
+  assert.match(stdout, /\(docs\/license\)/);
+});
+
+test('passing checks are compact unless --verbose is used', () => {
+  assert.doesNotMatch(audit().stdout, /Scripts presentes/);
+  assert.match(audit('--verbose').stdout, /Scripts presentes/);
+});
+
+test('failures are always explained', () => {
+  const { stdout } = audit();
+  assert.match(stdout, /Falta: \.nvmrc/);
+  assert.match(stdout, /No se encontró un archivo LICENSE/);
+});
+
+test('output has no colors when it is not a terminal, and --color forces them', () => {
+  assert.doesNotMatch(audit().stdout, /\u001b/);
+  assert.match(audit('--color').stdout, /\u001b\[3[123]m/);
+});
+
+test('--no-color wins over --color', () => {
+  assert.doesNotMatch(audit('--color', '--no-color').stdout, /\u001b/);
+});
+
+test('colors do not change the text', () => {
+  const strip = (text) => text.replace(/\u001b\[[0-9;]*m/g, '');
+  const cwd = path.join(failingRepo(), 'web');
+  const plain = cli('audit', 'angular', '--cwd', cwd).stdout;
+  const colored = cli('audit', 'angular', '--cwd', cwd, '--color').stdout;
+  assert.equal(strip(colored), plain);
+});
+
+test('unknown options are rejected instead of silently ignored', () => {
+  const result = audit('--verbos');
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /--verbos/);
+});
+
+test('--json is never colored', () => {
+  assert.doesNotMatch(audit('--json', '--color').stdout, /\u001b/);
+});

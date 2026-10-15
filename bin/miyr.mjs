@@ -7,8 +7,9 @@ import { MANIFEST_FILE, loadManifest } from '../src/lib/manifest.mjs';
 import { formatText } from '../src/report.mjs';
 
 const USAGE = `Uso:
-  miyr audit <perfil> [--cwd <ruta>] [--json]   Audita una carpeta con el perfil indicado
-  miyr audit [--project <nombre>] [--json]      Audita los proyectos declarados en ${MANIFEST_FILE}
+  miyr audit <perfil> [--cwd <ruta>]   Audita una carpeta con el perfil indicado
+  miyr audit [--project <nombre>]      Audita los proyectos declarados en ${MANIFEST_FILE}
+Opciones: --json  --verbose  --color  --no-color
 Perfiles: ${Object.keys(profiles).join(', ')}`;
 
 const fail = (message, withUsage = false) => {
@@ -17,6 +18,14 @@ const fail = (message, withUsage = false) => {
 };
 
 const args = process.argv.slice(2);
+const VALUE_OPTIONS = ['cwd', 'project'];
+const FLAGS = ['json', 'verbose', 'color', 'no-color'];
+for (let i = 1; i < args.length; i++) {
+  if (!args[i].startsWith('--')) continue;
+  const name = args[i].slice(2);
+  if (VALUE_OPTIONS.includes(name)) i += 1;
+  else if (!FLAGS.includes(name)) fail(`Opción desconocida: ${args[i]}`, true);
+}
 const flag = (name) => args.includes(`--${name}`);
 const option = (name) => {
   const i = args.indexOf(`--${name}`);
@@ -61,5 +70,7 @@ const report = {
   })),
 };
 
-console.log(flag('json') ? JSON.stringify(report, null, 2) : formatText(report));
+// Colors only on a real terminal (or when forced), and never when NO_COLOR is set.
+const color = !flag('no-color') && (flag('color') || (process.stdout.isTTY && !process.env.NO_COLOR && process.env.TERM !== 'dumb'));
+console.log(flag('json') ? JSON.stringify(report, null, 2) : formatText(report, { color, verbose: flag('verbose') }));
 process.exitCode = report.projects.every((p) => p.results.every((r) => r.status === 'pass')) ? 0 : 1;

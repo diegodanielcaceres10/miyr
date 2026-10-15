@@ -17,7 +17,17 @@ Profiles extend each other: `core` < `node` < `angular`. Exit code `0` when ever
 
 The repository root is the nearest folder with `.git`, looking upwards from `--cwd` (or from the current folder). Project files (`package.json`, lockfile, `tsconfig.json`) are read from the project folder. Repository-level files are searched from the project folder up to the repository root, nearest first: `README`, `LICENSE`, `.editorconfig`, `.nvmrc`, and every `.gitignore` in the chain. Workflows are only read from `<root>/.github/workflows`, as GitHub does.
 
-The text output has one block per project with a `Resumen` line, so you can copy it as is. `--json` prints `{ root, projects: [{ name, path, profile, results }] }`.
+### Output
+
+The text report has one block per project, grouped by area (Configuración, Tipado, CI/CD, Documentación). Every check shows its status, its title and its stable id, so you can refer to it, for example `config/node-version`. Passing checks take a single line; failures always show the message, the evidence and the suggested fix. The last line is a `Resumen` with the totals.
+
+| Option | Effect |
+|---|---|
+| `--verbose` | Also show the message of passing checks |
+| `--color` / `--no-color` | Force or disable colors. By default they are used only on a terminal, and never when `NO_COLOR` is set |
+| `--json` | Print `{ root, projects: [{ name, path, profile, results }] }`, never colored |
+
+Colors only wrap the text, so the report is the same once they are removed. Unknown options are rejected.
 
 ## Project manifest
 
