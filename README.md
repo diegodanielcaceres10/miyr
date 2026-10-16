@@ -5,6 +5,8 @@ Reusable AI audit prompts and commands to keep personal projects consistent, sec
 
 Two ways to say which project to audit. Neither guesses anything: the folder and the profile are always explicit.
 
+**A repository is only audited if it has a `.miyr.json` at its root, in both modes.** Without it miyr stops with exit code `2`, prints a message that names the root where the file belongs and shows an example, and analyzes nothing. In explicit mode the file only has to exist; in manifest mode it is also validated and tells miyr which projects to audit.
+
 ```bash
 # 1. In the command: one folder, one profile
 node bin/miyr.mjs audit <profile> [--cwd <path>] [--json]
@@ -31,7 +33,7 @@ Colors only wrap the text, so the report is the same once they are removed. Unkn
 
 ## Project manifest
 
-`.miyr.json` only says where each project lives and which profile applies. It cannot change rules.
+`.miyr.json` lives at the root of the audited repository (the folder with `.git`), not in this repo. It only says where each project lives and which profile applies. It cannot change rules. To keep it out of the audited repo's history, add it to `.git/info/exclude`.
 
 ```json
 {

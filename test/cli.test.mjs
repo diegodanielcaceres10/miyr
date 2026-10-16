@@ -26,7 +26,7 @@ test('audit <profile> exits 0 when every check passes', () => {
 
 test('audit <profile> exits 1 when a check fails', () => {
   assert.equal(cli('audit', 'angular', '--cwd', completeProject({ 'tsconfig.json': { compilerOptions: {} } })).status, 1);
-  assert.equal(cli('audit', 'core', '--cwd', project({ '.git/HEAD': 'x' })).status, 1);
+  assert.equal(cli('audit', 'core', '--cwd', project({ '.git/HEAD': 'x', '.miyr.json': { projects: [{ path: '.', profile: 'core' }] } })).status, 1);
 });
 
 test('audit <profile> looks for repo-level files from the project folder up to the repo root', () => {
@@ -112,7 +112,7 @@ test('manifest mode exits 2 for an unknown project and lists the available ones'
 });
 
 test('manifest mode exits 2 when .miyr.json is missing', () => {
-  const result = cli('audit', '--cwd', completeRepo());
+  const result = cli('audit', '--cwd', completeRepo({ '.miyr.json': null }));
   assert.equal(result.status, 2);
   assert.match(result.stderr, /\.miyr\.json/);
 });
@@ -185,4 +185,67 @@ test('unknown options are rejected instead of silently ignored', () => {
 
 test('--json is never colored', () => {
   assert.doesNotMatch(audit('--json', '--color').stdout, /\u001b/);
+});
+
+// --- the manifest at the repository root is required, in both modes
+
+test('explicit mode refuses to analyze a repo without .miyr.json at its root', () => {
+  const root = completeRepo({ '.miyr.json': null });
+  const result = cli('audit', 'angular', '--cwd', path.join(root, 'web'));
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '', 'nothing may be analyzed or printed');
+  assert.match(result.stderr, /\.miyr\.json/);
+  assert.ok(result.stderr.includes(root), 'the message names the repository root where the file belongs');
+});
+
+test('explicit mode on the repo root itself is refused the same way', () => {
+  const root = completeRepo({ '.miyr.json': null });
+  const result = cli('audit', 'angular', '--cwd', root);
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
+});
+
+test('the missing manifest message shows an example to copy', () => {
+  const { stderr } = cli('audit', 'angular', '--cwd', completeRepo({ '.miyr.json': null }));
+  assert.match(stderr, /"projects"/);
+  assert.match(stderr, /"profile"/);
+});
+
+test('manifest mode prints nothing on stdout when the manifest is missing', () => {
+  const result = cli('audit', '--cwd', completeRepo({ '.miyr.json': null }));
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
+});
+
+test('explicit mode only needs the manifest to exist, not to list the audited folder', () => {
+  const root = completeRepo({ '.miyr.json': { projects: [{ name: 'other', path: 'web', profile: 'core' }] } });
+  assert.equal(cli('audit', 'angular', '--cwd', path.join(root, 'web')).status, 0);
+});
+
+test('a folder outside any repository without a manifest is refused', () => {
+  const result = cli('audit', 'node', '--cwd', project({ 'package.json': {} }));
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /\.miyr\.json/);
+});
+
+test('usage errors are still reported before the manifest is looked for', () => {
+  const result = cli('audit', 'cobol', '--cwd', completeRepo({ '.miyr.json': null }));
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /Perfil desconocido: cobol/);
+});
+
+test('--project in explicit mode is reported as a usage error even when the manifest is missing', () => {
+  const root = completeRepo({ '.miyr.json': null });
+  const result = cli('audit', 'node', '--project', 'web', '--cwd', path.join(root, 'web'));
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /--project solo se usa con el manifiesto/);
+});
+
+test('when the folder itself is taken as the root, the message explains the missing .git', () => {
+  const dir = project({ 'package.json': {} });
+  const { stderr } = cli('audit', 'node', '--cwd', dir);
+  // A .git folder above the temp directory (unusual) would make that repo the root instead.
+  if (stderr.includes(`raíz del repo: ${dir}`)) assert.match(stderr, /\.git/);
+  else assert.match(stderr, /\.miyr\.json/);
 });

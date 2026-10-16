@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { profiles, runAudit } from '../src/audits/index.mjs';
 import { findRepoRoot } from '../src/lib/context.mjs';
-import { MANIFEST_FILE, loadManifest } from '../src/lib/manifest.mjs';
+import { MANIFEST_FILE, loadManifest, missingManifestMessage } from '../src/lib/manifest.mjs';
 import { formatText } from '../src/report.mjs';
 
 const USAGE = `Uso:
@@ -43,16 +43,24 @@ const profile = first && !first.startsWith('--') ? first : null;
 
 const start = path.resolve(option('cwd') ?? process.cwd());
 if (!isDirectory(start)) fail(`No existe la carpeta: ${start}`);
-const root = findRepoRoot(start) ?? start;
+const gitRoot = findRepoRoot(start);
+const root = gitRoot ?? start;
+
+// A repository is only audited when it has opted in with a manifest at its root (both modes).
+function requireManifest() {
+  if (!fs.existsSync(path.join(root, MANIFEST_FILE))) fail(missingManifestMessage(root, { git: gitRoot !== null }));
+}
 
 let targets;
 if (profile) {
   // Explicit mode: the folder and the profile come from the command line.
   if (!Object.hasOwn(profiles, profile)) fail(`Perfil desconocido: ${profile}`, true);
   if (option('project')) fail('--project solo se usa con el manifiesto (sin indicar perfil).', true);
+  requireManifest();
   targets = [{ name: path.basename(start), path: posixRelative(root, start), dir: start, profile }];
 } else {
   // Manifest mode: the repository root declares where each project lives.
+  requireManifest();
   const { projects, error } = loadManifest(root, Object.keys(profiles));
   if (error) fail(error);
   const wanted = option('project');

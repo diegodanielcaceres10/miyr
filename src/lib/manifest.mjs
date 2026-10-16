@@ -9,13 +9,28 @@ const PROJECT_KEYS = ['name', 'path', 'profile'];
 const NAME = /^[\w./-]+$/;
 const posix = (p) => p.split(path.sep).join('/');
 
+/** Message shown when the repository root has no manifest. `git: false` means no .git folder was found. */
+export function missingManifestMessage(root, { git = true } = {}) {
+  return [
+    `No se encontró ${MANIFEST_FILE} en la raíz del repo: ${root}`,
+    ...(git ? [] : ['(No se encontró una carpeta .git desde aquí, así que se tomó esa carpeta como raíz.)']),
+    'miyr solo audita repos que declaran sus proyectos. Crea ese archivo en la raíz, por ejemplo:',
+    '',
+    '  {',
+    '    "projects": [',
+    '      { "name": "web", "path": "web", "profile": "angular" }',
+    '    ]',
+    '  }',
+  ].join('\n');
+}
+
 /**
  * Loads and validates <root>/.miyr.json. The manifest only says WHERE each project lives
  * and WHICH profile applies; it cannot change rules. Returns { projects } or { error }.
  */
 export function loadManifest(root, profileNames) {
   const file = path.join(root, MANIFEST_FILE);
-  if (!fs.existsSync(file)) return { error: `No existe ${MANIFEST_FILE} en la raíz del repo (${root}).` };
+  if (!fs.existsSync(file)) return { error: missingManifestMessage(root) };
 
   let data;
   try {

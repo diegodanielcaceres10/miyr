@@ -75,6 +75,7 @@ function defaultFiles() {
     LICENSE: MIT,
     '.github/workflows/ci.yml': WORKFLOW,
     'tsconfig.json': { compilerOptions: { strict: true } },
+    '.miyr.json': { projects: [{ path: '.', profile: 'angular' }] },
   };
 }
 
@@ -108,5 +109,6 @@ export function completeRepo(overrides = {}) {
   for (const [name, content] of Object.entries(defaultFiles())) {
     files[PROJECT_LEVEL.includes(name) ? `web/${name}` : name] = content;
   }
+  files['.miyr.json'] = { projects: [{ name: 'web', path: 'web', profile: 'angular' }] };
   return project(withOverrides(files, overrides));
 }

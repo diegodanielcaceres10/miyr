@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { MANIFEST_FILE, loadManifest } from '../../src/lib/manifest.mjs';
+import { MANIFEST_FILE, loadManifest, missingManifestMessage } from '../../src/lib/manifest.mjs';
 import { project } from '../../test-support/project.mjs';
 
 const PROFILES = ['core', 'node', 'angular'];
@@ -106,4 +106,24 @@ test('aggregates every problem in a single message', () => {
   assert.match(error, /missing/);
   assert.match(error, /cobol/);
   assert.match(error, /path/);
+});
+
+test('the missing manifest message names the file, the repository root and gives an example', () => {
+  const message = missingManifestMessage('/work/nura');
+  assert.match(message, /\.miyr\.json/);
+  assert.ok(message.includes('/work/nura'));
+  assert.match(message, /"projects"/);
+  assert.match(message, /"profile"/);
+  assert.doesNotMatch(message, /\.git\b/);
+});
+
+test('without a .git folder the message explains why the folder itself was taken as the root', () => {
+  const message = missingManifestMessage('/work/loose', { git: false });
+  assert.match(message, /\.git/);
+  assert.ok(message.includes('/work/loose'));
+});
+
+test('loadManifest uses the same message when the file is missing', () => {
+  const root = project({});
+  assert.equal(loadManifest(root, PROFILES).error, missingManifestMessage(root));
 });
