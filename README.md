@@ -5,7 +5,7 @@ Reusable AI audit prompts and commands to keep personal projects consistent, sec
 
 Two ways to say which project to audit. Neither guesses anything: the folder and the profile are always explicit.
 
-**A repository is only audited if it has a `.miyr.json` at its root, in both modes.** Without it miyr stops with exit code `2`, prints a message that names the root where the file belongs and shows an example, and analyzes nothing. In explicit mode the file only has to exist; in manifest mode it is also validated and tells miyr which projects to audit.
+**The manifest is searched exactly in the folder you pass with `--cwd` (or the current folder), never in parent folders, and nothing is audited without it.** If that folder has no `.miyr.json`, miyr stops with exit code `2`, names the folder it searched and analyzes nothing. This applies to both modes: in explicit mode the file only has to exist; in manifest mode it is also validated and tells miyr which projects to audit.
 
 ```bash
 # 1. In the command: one folder, one profile
@@ -17,7 +17,7 @@ node bin/miyr.mjs audit [--project <name>] [--cwd <path>] [--json]
 
 Profiles extend each other: `core` < `node` < `angular`. Exit code `0` when every check passes, `1` when any check fails, `2` on invalid usage or an invalid manifest. Run `npm test` to execute the test suite.
 
-The repository root is the nearest folder with `.git`, looking upwards from `--cwd` (or from the current folder). Project files (`package.json`, lockfile, `tsconfig.json`) are read from the project folder. Repository-level files are searched from the project folder up to the repository root, nearest first: `README`, `LICENSE`, `.editorconfig`, `.nvmrc`, and every `.gitignore` in the chain. Workflows are only read from `<root>/.github/workflows`, as GitHub does.
+Repository-level files are looked up to the repository root, which is the nearest folder with `.git` above `--cwd` (or above the current folder). Only the manifest is not searched upwards. Project files (`package.json`, lockfile, `tsconfig.json`) are read from the project folder. Repository-level files are searched from the project folder up to the repository root, nearest first: `README`, `LICENSE`, `.editorconfig`, `.nvmrc`, and every `.gitignore` in the chain. Workflows are only read from `<root>/.github/workflows`, as GitHub does.
 
 ### Output
 
@@ -33,7 +33,7 @@ Colors only wrap the text, so the report is the same once they are removed. Unkn
 
 ## Project manifest
 
-`.miyr.json` lives at the root of the audited repository (the folder with `.git`), not in this repo. It only says where each project lives and which profile applies. It cannot change rules. To keep it out of the audited repo's history, add it to `.git/info/exclude`.
+`.miyr.json` lives in the folder you give to miyr, normally the root of the audited repository, not in this repo. For a monorepo you run `audit --cwd <repo root>`; passing a subfolder such as `web` looks for a manifest inside `web`. It only says where each project lives and which profile applies. It cannot change rules. To keep it out of the audited repo's history, add it to `.git/info/exclude`.
 
 ```json
 {
@@ -44,7 +44,7 @@ Colors only wrap the text, so the report is the same once they are removed. Unkn
 }
 ```
 
-- `path` is relative to the repository root (`"."` is the root itself) and must be an existing folder inside the repository.
+- `path` is relative to the folder that contains the manifest (`"."` is that folder) and must be an existing folder inside it.
 - `profile` is one of the available profiles.
 - `name` is optional (defaults to the path) and is what `--project` receives. Names and folders must be unique.
 - Unknown keys are rejected, so a typo does not go unnoticed.

@@ -9,28 +9,22 @@ const PROJECT_KEYS = ['name', 'path', 'profile'];
 const NAME = /^[\w./-]+$/;
 const posix = (p) => p.split(path.sep).join('/');
 
-/** Message shown when the repository root has no manifest. `git: false` means no .git folder was found. */
-export function missingManifestMessage(root, { git = true } = {}) {
+/** Message shown when the folder given to miyr has no manifest. */
+export function missingManifestMessage(dir) {
   return [
-    `No se encontró ${MANIFEST_FILE} en la raíz del repo: ${root}`,
-    ...(git ? [] : ['(No se encontró una carpeta .git desde aquí, así que se tomó esa carpeta como raíz.)']),
-    'miyr solo audita repos que declaran sus proyectos. Crea ese archivo en la raíz, por ejemplo:',
-    '',
-    '  {',
-    '    "projects": [',
-    '      { "name": "web", "path": "web", "profile": "angular" }',
-    '    ]',
-    '  }',
+    `No se encontró ${MANIFEST_FILE} en la carpeta indicada: ${dir}`,
+    'miyr lo busca exactamente en la carpeta de --cwd (o en la actual), sin subir a carpetas superiores.',
   ].join('\n');
 }
 
 /**
- * Loads and validates <root>/.miyr.json. The manifest only says WHERE each project lives
- * and WHICH profile applies; it cannot change rules. Returns { projects } or { error }.
+ * Loads and validates <dir>/.miyr.json, where <dir> is exactly the folder given to miyr (it is never
+ * searched in parent folders). The manifest only says WHERE each project lives and WHICH profile
+ * applies, relative to <dir>; it cannot change rules. Returns { projects } or { error }.
  */
-export function loadManifest(root, profileNames) {
-  const file = path.join(root, MANIFEST_FILE);
-  if (!fs.existsSync(file)) return { error: missingManifestMessage(root) };
+export function loadManifest(dir, profileNames) {
+  const file = path.join(dir, MANIFEST_FILE);
+  if (!fs.existsSync(file)) return { error: missingManifestMessage(dir) };
 
   let data;
   try {
@@ -65,17 +59,17 @@ export function loadManifest(root, profileNames) {
       if (!PROJECT_KEYS.includes(key)) errors.push(`${where}: clave desconocida "${key}"`);
     }
 
-    let dir = null;
+    let projectDir = null;
     let rel = '';
     if (typeof entry.path !== 'string' || entry.path.trim() === '') {
       errors.push(`${where}: falta "path"`);
     } else if (path.isAbsolute(entry.path)) {
-      errors.push(`${where}: "path" debe ser relativo a la raíz del repo (${entry.path})`);
+      errors.push(`${where}: "path" debe ser relativo a la carpeta del manifiesto (${entry.path})`);
     } else {
-      const resolved = path.resolve(root, entry.path);
-      rel = path.relative(root, resolved);
+      const resolved = path.resolve(dir, entry.path);
+      rel = path.relative(dir, resolved);
       if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
-        errors.push(`${where}: "path" sale del repositorio (${entry.path})`);
+        errors.push(`${where}: "path" sale de la carpeta del manifiesto (${entry.path})`);
       } else if (!fs.existsSync(resolved)) {
         errors.push(`${where}: no existe la carpeta ${entry.path}`);
       } else if (!fs.statSync(resolved).isDirectory()) {
@@ -83,7 +77,7 @@ export function loadManifest(root, profileNames) {
       } else if (dirs.has(resolved)) {
         errors.push(`${where}: carpeta repetida (${entry.path})`);
       } else {
-        dir = resolved;
+        projectDir = resolved;
         dirs.add(resolved);
       }
     }
@@ -101,14 +95,14 @@ export function loadManifest(root, profileNames) {
       } else {
         name = entry.name;
       }
-    } else if (dir) {
-      name = rel === '' ? path.basename(root) : posix(rel);
+    } else if (projectDir) {
+      name = rel === '' ? path.basename(dir) : posix(rel);
     }
     if (name !== null && names.has(name)) errors.push(`${where}: nombre repetido "${name}"`);
     if (name !== null) names.add(name);
 
-    if (dir && name !== null && profileNames.includes(entry.profile)) {
-      projects.push({ name, path: posix(rel) || '.', dir, profile: entry.profile });
+    if (projectDir && name !== null && profileNames.includes(entry.profile)) {
+      projects.push({ name, path: posix(rel) || '.', dir: projectDir, profile: entry.profile });
     }
   });
 

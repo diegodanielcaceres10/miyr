@@ -108,19 +108,18 @@ test('aggregates every problem in a single message', () => {
   assert.match(error, /path/);
 });
 
-test('the missing manifest message names the file, the repository root and gives an example', () => {
-  const message = missingManifestMessage('/work/nura');
+test('the missing manifest message names the exact folder that was searched', () => {
+  const message = missingManifestMessage('/work/nura/web');
   assert.match(message, /\.miyr\.json/);
-  assert.ok(message.includes('/work/nura'));
-  assert.match(message, /"projects"/);
-  assert.match(message, /"profile"/);
-  assert.doesNotMatch(message, /\.git\b/);
+  assert.ok(message.includes('/work/nura/web'));
+  assert.match(message, /--cwd/);
 });
 
-test('without a .git folder the message explains why the folder itself was taken as the root', () => {
-  const message = missingManifestMessage('/work/loose', { git: false });
-  assert.match(message, /\.git/);
-  assert.ok(message.includes('/work/loose'));
+test('the missing manifest message is short and carries no example', () => {
+  const message = missingManifestMessage('/work/nura');
+  assert.doesNotMatch(message, /"projects"/);
+  assert.doesNotMatch(message, /\{/);
+  assert.ok(message.split('\n').length <= 2);
 });
 
 test('loadManifest uses the same message when the file is missing', () => {

@@ -43,12 +43,13 @@ const profile = first && !first.startsWith('--') ? first : null;
 
 const start = path.resolve(option('cwd') ?? process.cwd());
 if (!isDirectory(start)) fail(`No existe la carpeta: ${start}`);
-const gitRoot = findRepoRoot(start);
-const root = gitRoot ?? start;
+// Repo-level files (README, LICENSE, workflows...) are searched up to the git root. The manifest is not:
+// it must be exactly in `start`, the folder given with --cwd (or the current one).
+const root = findRepoRoot(start) ?? start;
 
-// A repository is only audited when it has opted in with a manifest at its root (both modes).
+// Nothing is audited unless the folder given has a manifest of its own (both modes).
 function requireManifest() {
-  if (!fs.existsSync(path.join(root, MANIFEST_FILE))) fail(missingManifestMessage(root, { git: gitRoot !== null }));
+  if (!fs.existsSync(path.join(start, MANIFEST_FILE))) fail(missingManifestMessage(start));
 }
 
 let targets;
@@ -59,9 +60,9 @@ if (profile) {
   requireManifest();
   targets = [{ name: path.basename(start), path: posixRelative(root, start), dir: start, profile }];
 } else {
-  // Manifest mode: the repository root declares where each project lives.
+  // Manifest mode: the manifest in the given folder declares where each project lives.
   requireManifest();
-  const { projects, error } = loadManifest(root, Object.keys(profiles));
+  const { projects, error } = loadManifest(start, Object.keys(profiles));
   if (error) fail(error);
   const wanted = option('project');
   targets = wanted ? projects.filter((p) => p.name === wanted) : projects;

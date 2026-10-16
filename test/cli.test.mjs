@@ -15,6 +15,9 @@ const TWO = {
     { name: 'landing', path: 'landing', profile: 'node' },
   ],
 };
+// A repo whose manifest sits INSIDE web/, which is where explicit mode on that folder looks for it.
+const repoWithWebManifest = (overrides = {}) =>
+  completeRepo({ 'web/.miyr.json': { projects: [{ path: '.', profile: 'angular' }] }, ...overrides });
 const withManifest = (manifest, extra = {}) =>
   completeRepo({ '.miyr.json': manifest, ...nodeProjectFiles('landing'), ...extra });
 
@@ -30,9 +33,9 @@ test('audit <profile> exits 1 when a check fails', () => {
 });
 
 test('audit <profile> looks for repo-level files from the project folder up to the repo root', () => {
-  const root = completeRepo();
+  const root = repoWithWebManifest();
   assert.equal(cli('audit', 'angular', '--cwd', path.join(root, 'web')).status, 0);
-  const missing = completeRepo({ LICENSE: null });
+  const missing = repoWithWebManifest({ LICENSE: null });
   assert.equal(cli('audit', 'angular', '--cwd', path.join(missing, 'web')).status, 1);
 });
 
@@ -57,7 +60,7 @@ test('--project is only valid in manifest mode', () => {
 });
 
 test('--json prints the root and one entry per project with its results', () => {
-  const root = completeRepo();
+  const root = repoWithWebManifest();
   const result = cli('audit', 'angular', '--json', '--cwd', path.join(root, 'web'));
   const report = JSON.parse(result.stdout);
   assert.equal(report.root, root);
@@ -69,7 +72,7 @@ test('--json prints the root and one entry per project with its results', () => 
 });
 
 test('text output has a header and a summary line that can be copied', () => {
-  const result = cli('audit', 'angular', '--cwd', path.join(completeRepo(), 'web'));
+  const result = cli('audit', 'angular', '--cwd', path.join(repoWithWebManifest(), 'web'));
   assert.match(result.stdout, /== web \(angular, ruta: web\) ==/);
   assert.match(result.stdout, /Resumen: \d+ OK, 0 FAIL, 0 ERR/);
 });
@@ -86,9 +89,11 @@ test('manifest mode audits every project listed in .miyr.json', () => {
   assert.equal(report.projects[1].results.length, profiles.node.length);
 });
 
-test('manifest mode works when started from inside a project folder', () => {
+test('manifest mode does not look for the manifest above the folder it is given', () => {
   const root = withManifest(TWO);
-  assert.equal(cli('audit', '--cwd', path.join(root, 'web')).status, 0);
+  const result = cli('audit', '--cwd', path.join(root, 'web'));
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
 });
 
 test('--project audits a single project', () => {
@@ -132,7 +137,7 @@ test('a manifest can point a project at the repository root', () => {
 
 // --- output format
 
-const failingRepo = () => completeRepo({ LICENSE: null, 'web/.nvmrc': null });
+const failingRepo = () => repoWithWebManifest({ LICENSE: null, 'web/.nvmrc': null });
 const audit = (...extra) => cli('audit', 'angular', '--cwd', path.join(failingRepo(), 'web'), ...extra);
 
 test('text output is grouped by area, with documentation apart from configuration', () => {
@@ -195,7 +200,7 @@ test('explicit mode refuses to analyze a repo without .miyr.json at its root', (
   assert.equal(result.status, 2);
   assert.equal(result.stdout, '', 'nothing may be analyzed or printed');
   assert.match(result.stderr, /\.miyr\.json/);
-  assert.ok(result.stderr.includes(root), 'the message names the repository root where the file belongs');
+  assert.ok(result.stderr.includes(path.join(root, 'web')), 'the message names the folder that was searched');
 });
 
 test('explicit mode on the repo root itself is refused the same way', () => {
@@ -205,10 +210,10 @@ test('explicit mode on the repo root itself is refused the same way', () => {
   assert.equal(result.stdout, '');
 });
 
-test('the missing manifest message shows an example to copy', () => {
+test('the missing manifest message is brief and has no example', () => {
   const { stderr } = cli('audit', 'angular', '--cwd', completeRepo({ '.miyr.json': null }));
-  assert.match(stderr, /"projects"/);
-  assert.match(stderr, /"profile"/);
+  assert.match(stderr, /No se encontró \.miyr\.json/);
+  assert.doesNotMatch(stderr, /"projects"/);
 });
 
 test('manifest mode prints nothing on stdout when the manifest is missing', () => {
@@ -218,7 +223,7 @@ test('manifest mode prints nothing on stdout when the manifest is missing', () =
 });
 
 test('explicit mode only needs the manifest to exist, not to list the audited folder', () => {
-  const root = completeRepo({ '.miyr.json': { projects: [{ name: 'other', path: 'web', profile: 'core' }] } });
+  const root = completeRepo({ 'web/.miyr.json': { projects: [{ name: 'other', path: '.', profile: 'core' }] } });
   assert.equal(cli('audit', 'angular', '--cwd', path.join(root, 'web')).status, 0);
 });
 
@@ -242,10 +247,47 @@ test('--project in explicit mode is reported as a usage error even when the mani
   assert.match(result.stderr, /--project solo se usa con el manifiesto/);
 });
 
-test('when the folder itself is taken as the root, the message explains the missing .git', () => {
-  const dir = project({ 'package.json': {} });
-  const { stderr } = cli('audit', 'node', '--cwd', dir);
-  // A .git folder above the temp directory (unusual) would make that repo the root instead.
-  if (stderr.includes(`raíz del repo: ${dir}`)) assert.match(stderr, /\.git/);
-  else assert.match(stderr, /\.miyr\.json/);
+// --- the manifest is searched exactly in the folder that is given
+
+test('the manifest is searched exactly in the folder given, never above it', () => {
+  const root = completeRepo(); // the manifest exists only at the repository root
+  const web = path.join(root, 'web');
+  for (const args of [['audit', 'angular'], ['audit']]) {
+    const result = cli(...args, '--cwd', web);
+    assert.equal(result.status, 2, args.join(' '));
+    assert.equal(result.stdout, '', 'nothing may be analyzed');
+    assert.ok(result.stderr.includes(web), 'the message names the folder that was searched');
+  }
+});
+
+test('the same repo is audited when the folder with the manifest is the one given', () => {
+  const root = completeRepo();
+  assert.equal(cli('audit', '--cwd', root).status, 0);
+});
+
+test('a trailing separator on --cwd makes no difference', () => {
+  const web = path.join(repoWithWebManifest(), 'web') + path.sep;
+  assert.equal(cli('audit', 'angular', '--cwd', web).status, 0);
+});
+
+test('the message does not claim the folder is the repository root', () => {
+  const { stderr } = cli('audit', 'angular', '--cwd', path.join(completeRepo(), 'web'));
+  assert.doesNotMatch(stderr, /raíz del repo/);
+});
+
+test('explicit mode on a folder uses the manifest of that folder, not the one at the repo root', () => {
+  const root = completeRepo({ 'web/.miyr.json': { projects: [{ path: '.', profile: 'core' }] } });
+  const report = JSON.parse(cli('audit', 'angular', '--json', '--cwd', path.join(root, 'web')).stdout);
+  assert.equal(report.projects[0].profile, 'angular');
+});
+
+test('a manifest in a subfolder of the repo resolves its paths from that subfolder', () => {
+  const root = completeRepo({
+    'apps/.miyr.json': { projects: [{ name: 'site', path: 'site', profile: 'node' }] },
+    ...nodeProjectFiles('apps/site'),
+  });
+  const result = cli('audit', '--json', '--cwd', path.join(root, 'apps'));
+  assert.equal(result.status, 0, result.stdout);
+  const report = JSON.parse(result.stdout);
+  assert.deepEqual(report.projects.map((p) => [p.name, p.profile]), [['site', 'node']]);
 });
