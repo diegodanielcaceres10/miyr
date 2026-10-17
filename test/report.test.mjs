@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatText, groupByArea, summarize } from '../src/report.mjs';
+import { formatChoices, formatText, groupByArea, summarize } from '../src/report.mjs';
 
 const pass = { id: 'config/one', title: 'Uno', status: 'pass', message: 'todo bien' };
 const fail = { id: 'config/two', title: 'Dos', status: 'fail', message: 'algo mal', fix: 'arréglalo' };
@@ -83,4 +83,29 @@ test('several projects are separated and keep their order', () => {
   assert.ok(text.indexOf('== web') < text.indexOf('== landing'));
   assert.match(text, /Resumen: 1 OK, 0 FAIL, 0 ERR/);
   assert.match(text, /Resumen: 0 OK, 1 FAIL, 0 ERR/);
+});
+
+const PROJECTS = [
+  { name: 'web', path: 'web', profile: 'angular' },
+  { name: 'dashboard', path: 'apps/dashboard', profile: 'node' },
+];
+
+test('formatChoices lists every project with its profile and folder, aligned', () => {
+  const text = formatChoices(PROJECTS);
+  assert.match(text, /2 proyectos/);
+  assert.match(text, /^ {2}web {8}angular {2}web$/m);
+  assert.match(text, /^ {2}dashboard {2}node {5}apps\/dashboard$/m);
+});
+
+test('formatChoices suggests --project and --all, echoing the folder given', () => {
+  const text = formatChoices(PROJECTS, { folder: '..\\nura' });
+  assert.match(text, /node bin\/miyr\.mjs audit --project web \.\.\\nura/);
+  assert.match(text, /node bin\/miyr\.mjs audit --all \.\.\\nura/);
+});
+
+test('formatChoices quotes a folder that contains spaces and omits it when none was given', () => {
+  assert.match(formatChoices(PROJECTS, { folder: 'mi repo' }), /--project web "mi repo"/);
+  const bare = formatChoices(PROJECTS);
+  assert.match(bare, /audit --project web$/m);
+  assert.match(bare, /audit --all$/m);
 });

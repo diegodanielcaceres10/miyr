@@ -71,3 +71,20 @@ export function formatText({ projects }, { color = false, verbose = false } = {}
   }
   return lines.join('\n');
 }
+
+/** Shown when a manifest declares several projects and none was chosen. `folder` is echoed as the user typed it. */
+export function formatChoices(projects, { folder } = {}) {
+  const width = (key) => Math.max(...projects.map((project) => project[key].length));
+  const rows = projects.map(
+    (project) => `  ${project.name.padEnd(width('name'))}  ${project.profile.padEnd(width('profile'))}  ${project.path}`,
+  );
+  const target = folder === undefined ? '' : ` ${/\s/.test(folder) ? `"${folder}"` : folder}`;
+  return [
+    `El manifiesto declara ${projects.length} proyectos. Elige uno con --project:`,
+    '',
+    ...rows,
+    '',
+    `Uno:    node bin/miyr.mjs audit --project ${projects[0].name}${target}`,
+    `Todos:  node bin/miyr.mjs audit --all${target}`,
+  ].join('\n');
+}

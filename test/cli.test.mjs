@@ -81,7 +81,7 @@ test('text output has a header and a summary line that can be copied', () => {
 
 test('manifest mode audits every project listed in .miyr.json', () => {
   const root = withManifest(TWO);
-  const result = cli('audit', '--json', '--cwd', root);
+  const result = cli('audit', '--all', '--json', '--cwd', root);
   assert.equal(result.status, 0, result.stdout);
   const report = JSON.parse(result.stdout);
   assert.deepEqual(report.projects.map((p) => [p.name, p.profile]), [['web', 'angular'], ['landing', 'node']]);
@@ -104,7 +104,7 @@ test('--project audits a single project', () => {
 
 test('manifest mode exits 1 when any project fails', () => {
   const root = withManifest(TWO, { 'landing/package-lock.json': null });
-  const result = cli('audit', '--cwd', root);
+  const result = cli('audit', '--all', '--cwd', root);
   assert.equal(result.status, 1);
   assert.match(result.stdout, /== landing \(node, ruta: landing\) ==/);
 });
@@ -237,7 +237,8 @@ test('a folder outside any repository without a manifest is refused', () => {
 test('usage errors are still reported before the manifest is looked for', () => {
   const result = cli('audit', 'cobol', '--cwd', completeRepo({ '.miyr.json': null }));
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /Perfil desconocido: cobol/);
+  assert.match(result.stderr, /"cobol" no es un perfil conocido ni una carpeta existente/);
+  assert.doesNotMatch(result.stderr, /No se encontró \.miyr\.json/);
 });
 
 test('--project in explicit mode is reported as a usage error even when the manifest is missing', () => {
@@ -290,4 +291,92 @@ test('a manifest in a subfolder of the repo resolves its paths from that subfold
   assert.equal(result.status, 0, result.stdout);
   const report = JSON.parse(result.stdout);
   assert.deepEqual(report.projects.map((p) => [p.name, p.profile]), [['site', 'node']]);
+});
+
+// --- choosing what to audit: miyr audit [folder] [--project <name> | --all]
+
+const MANY = withManifest(TWO);
+const choose = (...extra) => cli('audit', ...extra);
+
+test('the folder can be given as a plain argument or with --cwd, with the same result', () => {
+  const root = completeRepo();
+  const viaArgument = JSON.parse(cli('audit', '--json', root).stdout);
+  const viaOption = JSON.parse(cli('audit', '--json', '--cwd', root).stdout);
+  assert.deepEqual(viaArgument, viaOption);
+  assert.equal(viaArgument.projects[0].name, 'web');
+});
+
+test('a manifest with one project audits it without asking', () => {
+  const result = cli('audit', completeRepo());
+  assert.equal(result.status, 0, result.stdout);
+  assert.match(result.stdout, /== web \(angular/);
+});
+
+test('a manifest with several projects lists them and audits nothing', () => {
+  const result = choose(MANY);
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '', 'nothing may be analyzed');
+  assert.match(result.stderr, /2 proyectos/);
+  assert.match(result.stderr, /web\s+angular\s+web/);
+  assert.match(result.stderr, /landing\s+node\s+landing/);
+  assert.match(result.stderr, /--project/);
+  assert.match(result.stderr, /--all/);
+});
+
+test('the options echo the folder that was given', () => {
+  assert.ok(choose(MANY).stderr.includes(`--project web ${MANY}`));
+  assert.ok(choose('--cwd', MANY).stderr.includes(`--project web ${MANY}`));
+});
+
+test('--project audits only that project, with the folder as an argument or with --cwd', () => {
+  for (const args of [['--project', 'landing', MANY], [MANY, '--project', 'landing'], ['--project', 'landing', '--cwd', MANY]]) {
+    const report = JSON.parse(choose('--json', ...args).stdout);
+    assert.deepEqual(report.projects.map((p) => p.name), ['landing'], args.join(' '));
+  }
+});
+
+test('--all audits every project', () => {
+  const report = JSON.parse(choose('--all', '--json', MANY).stdout);
+  assert.deepEqual(report.projects.map((p) => p.name), ['web', 'landing']);
+});
+
+test('--project and --all cannot be combined', () => {
+  assert.equal(choose('--project', 'web', '--all', MANY).status, 2);
+});
+
+test('--all is only valid with the manifest', () => {
+  const result = cli('audit', 'angular', '--all', '--cwd', completeProject());
+  assert.equal(result.status, 2);
+});
+
+test('with --json the choice list never reaches stdout', () => {
+  const result = choose('--json', MANY);
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
+});
+
+test('a profile followed by a folder works like --cwd', () => {
+  const web = path.join(repoWithWebManifest(), 'web');
+  assert.equal(cli('audit', 'angular', web).status, 0);
+});
+
+test('the folder cannot be given twice', () => {
+  const root = completeRepo();
+  const result = cli('audit', root, '--cwd', root);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /una sola vez/);
+});
+
+test('extra arguments are rejected', () => {
+  const root = completeRepo();
+  const result = cli('audit', root, 'sobra');
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /sobra/);
+});
+
+test('a word that is neither a profile nor a folder gets a clear message', () => {
+  const result = cli('audit', 'angualr');
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /"angualr" no es un perfil conocido ni una carpeta existente/);
+  assert.match(result.stderr, /angular/);
 });

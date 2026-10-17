@@ -3,21 +3,30 @@ Reusable AI audit prompts and commands to keep personal projects consistent, sec
 
 ## Usage
 
-Two ways to say which project to audit. Neither guesses anything: the folder and the profile are always explicit.
-
-**The manifest is searched exactly in the folder you pass with `--cwd` (or the current folder), never in parent folders, and nothing is audited without it.** If that folder has no `.miyr.json`, miyr stops with exit code `2`, names the folder it searched and analyzes nothing. This applies to both modes: in explicit mode the file only has to exist; in manifest mode it is also validated and tells miyr which projects to audit.
-
 ```bash
-# 1. In the command: one folder, one profile
-node bin/miyr.mjs audit <profile> [--cwd <path>] [--json]
-
-# 2. In the manifest (.miyr.json at the repository root): every project listed there
-node bin/miyr.mjs audit [--project <name>] [--cwd <path>] [--json]
+node bin/miyr.mjs audit [folder] [--project <name> | --all]
+node bin/miyr.mjs audit <profile> [folder]
 ```
+
+`folder` is the folder that contains the `.miyr.json` manifest; without it the current folder is used. `--cwd <folder>` is an equivalent way to give it. Nothing is guessed: the folder, the project and the profile are always explicit.
+
+**The manifest is searched exactly in that folder, never in parent folders, and nothing is audited without it.** If it is missing, miyr stops with exit code `2`, names the folder it searched and analyzes nothing.
+
+**Which project is audited**
+
+| Command | What happens |
+|---|---|
+| `audit ..\nura` and the manifest lists one project | That project is audited |
+| `audit ..\nura` and it lists several | Nothing is audited; the available projects are listed, with the commands to pick one (exit code `2`, on stderr) |
+| `audit --project dashboard ..\nura` | Only that project |
+| `audit --all ..\nura` | Every project in the manifest |
+| `audit angular ..\nura\web` | Explicit mode: that folder with that profile. The folder still needs a manifest, whose content is not read |
+
+If the first word is a profile name it selects explicit mode; any other word is the folder. To audit a folder that is named like a profile, write it as a path (`.\angular`).
 
 Profiles extend each other: `core` < `node` < `angular`. Exit code `0` when every check passes, `1` when any check fails, `2` on invalid usage or an invalid manifest. Run `npm test` to execute the test suite.
 
-Repository-level files are looked up to the repository root, which is the nearest folder with `.git` above `--cwd` (or above the current folder). Only the manifest is not searched upwards. Project files (`package.json`, lockfile, `tsconfig.json`) are read from the project folder. Repository-level files are searched from the project folder up to the repository root, nearest first: `README`, `LICENSE`, `.editorconfig`, `.nvmrc`, and every `.gitignore` in the chain. Workflows are only read from `<root>/.github/workflows`, as GitHub does.
+Repository-level files are looked up to the repository root, which is the nearest folder with `.git` above the folder given. Project files (`package.json`, lockfile, `tsconfig.json`) are read from the project folder. Searched from the project folder up to the repository root, nearest first: `README`, `LICENSE`, `.editorconfig`, `.nvmrc`, and every `.gitignore` in the chain. Workflows are only read from `<root>/.github/workflows`, as GitHub does.
 
 ### Output
 
@@ -33,7 +42,7 @@ Colors only wrap the text, so the report is the same once they are removed. Unkn
 
 ## Project manifest
 
-`.miyr.json` lives in the folder you give to miyr, normally the root of the audited repository, not in this repo. For a monorepo you run `audit --cwd <repo root>`; passing a subfolder such as `web` looks for a manifest inside `web`. It only says where each project lives and which profile applies. It cannot change rules. To keep it out of the audited repo's history, add it to `.git/info/exclude`.
+`.miyr.json` lives in the folder you give to miyr, normally the root of the audited repository, not in this repo. For a monorepo you run `audit <repo root>`; passing a subfolder such as `web` looks for a manifest inside `web`. It only says where each project lives and which profile applies. It cannot change rules. To keep it out of the audited repo's history, add it to `.git/info/exclude`.
 
 ```json
 {
