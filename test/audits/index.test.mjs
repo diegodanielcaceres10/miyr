@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { profiles, runAudit } from '../../src/audits/index.mjs';
-import { completeProject } from '../../test-support/project.mjs';
+import { completeProject, project } from '../../test-support/project.mjs';
 
 const ids = (profile) => profiles[profile].map((check) => check.id);
 
@@ -50,4 +50,27 @@ test('runAudit returns one passing result per check on a complete project', () =
 
 test('runAudit throws on an unknown profile', () => {
   assert.throws(() => runAudit('cobol', { cwd: '.' }), /cobol/);
+});
+
+test('node and angular projects without package.json report one failure instead of a cascade', () => {
+  const cwd = project({});
+  for (const name of ['node', 'angular']) {
+    const results = runAudit(name, { cwd });
+    assert.equal(results.length, 1, name);
+    assert.equal(results[0].id, 'config/project');
+    assert.equal(results[0].status, 'fail');
+    assert.ok(results[0].message.includes('package.json'));
+    assert.ok(results[0].message.includes(cwd), 'the message names the folder');
+    assert.match(results[0].fix, /\.miyr\.json/);
+  }
+});
+
+test('core projects do not need a package.json', () => {
+  const results = runAudit('core', { cwd: project({}) });
+  assert.equal(results.length, profiles.core.length);
+});
+
+test('the package.json precheck does not stop projects that have one', () => {
+  const results = runAudit('node', { cwd: project({ 'package.json': {} }) });
+  assert.equal(results.length, profiles.node.length);
 });

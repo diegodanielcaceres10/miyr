@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatChoices, formatText, groupByArea, summarize } from '../src/report.mjs';
+import { formatChoices, formatText, groupByArea, projectRows, summarize } from '../src/report.mjs';
 
 const pass = { id: 'config/one', title: 'Uno', status: 'pass', message: 'todo bien' };
 const fail = { id: 'config/two', title: 'Dos', status: 'fail', message: 'algo mal', fix: 'arréglalo' };
@@ -108,4 +108,8 @@ test('formatChoices quotes a folder that contains spaces and omits it when none 
   const bare = formatChoices(PROJECTS);
   assert.match(bare, /audit --project web$/m);
   assert.match(bare, /audit --all$/m);
+});
+
+test('projectRows aligns name, profile and folder without indentation', () => {
+  assert.deepEqual(projectRows(PROJECTS), ['web        angular  web', 'dashboard  node     apps/dashboard']);
 });

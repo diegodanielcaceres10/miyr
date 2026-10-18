@@ -126,3 +126,20 @@ test('loadManifest uses the same message when the file is missing', () => {
   const root = project({});
   assert.equal(loadManifest(root, PROFILES).error, missingManifestMessage(root));
 });
+
+test('accepts comments and trailing commas, like a hand-written tsconfig', () => {
+  const text = `{
+    // projects of this repo
+    "projects": [
+      { "name": "web", "path": "web", "profile": "angular" },
+      { "name": "dashboard", "path": "landing", "profile": "node" }, /* second one */
+    ],
+  }`;
+  const { projects, error } = load(repo(text));
+  assert.equal(error, undefined);
+  assert.deepEqual(projects.map((p) => p.name), ['web', 'dashboard']);
+});
+
+test('invalid JSON is still reported after the comments are ignored', () => {
+  assert.match(load(repo('{ // c\n "projects": [ }')).error, /inválido/);
+});

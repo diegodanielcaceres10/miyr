@@ -4,25 +4,25 @@ Reusable AI audit prompts and commands to keep personal projects consistent, sec
 ## Usage
 
 ```bash
-node bin/miyr.mjs audit [folder] [--project <name> | --all]
-node bin/miyr.mjs audit <profile> [folder]
+node bin/miyr.mjs audit [folder] [--project <name> | --all | --choose]
 ```
 
-`folder` is the folder that contains the `.miyr.json` manifest; without it the current folder is used. `--cwd <folder>` is an equivalent way to give it. Nothing is guessed: the folder, the project and the profile are always explicit.
+`folder` is the folder that contains the `.miyr.json` manifest; without it the current folder is used. `--cwd <folder>` is an equivalent way to give it. Nothing is guessed: the folder and the project are explicit, and the profile of each project is declared in the manifest, not on the command line.
 
-**The manifest is searched exactly in that folder, never in parent folders, and nothing is audited without it.** If it is missing, miyr stops with exit code `2`, names the folder it searched and analyzes nothing.
-
-**Which project is audited**
+**The manifest is searched exactly in that folder, never in parent folders, and nothing is audited without it.** If it is missing, miyr stops with exit code `2`, names the folder it searched and analyzes nothing. Then the manifest is validated (every `path` must exist, every `profile` must be known, names must be unique) and the project is selected.
 
 | Command | What happens |
 |---|---|
 | `audit ..\nura` and the manifest lists one project | That project is audited |
-| `audit ..\nura` and it lists several | Nothing is audited; the available projects are listed, with the commands to pick one (exit code `2`, on stderr) |
-| `audit --project dashboard ..\nura` | Only that project |
+| `audit ..\nura` and it lists several, on a terminal | A numbered menu asks which one to audit, then continues with it |
+| `audit ..\nura` and it lists several, without a terminal (CI, pipes) | Nothing is audited; the projects are listed with the commands to pick one (exit code `2`, on stderr) |
+| `audit --project dashboard ..\nura` | Only the project named `dashboard` |
 | `audit --all ..\nura` | Every project in the manifest |
-| `audit angular ..\nura\web` | Explicit mode: that folder with that profile. The folder still needs a manifest, whose content is not read |
+| `audit --choose ..\nura` | Shows the menu even without a terminal; the answer is read from stdin |
 
-If the first word is a profile name it selects explicit mode; any other word is the folder. To audit a folder that is named like a profile, write it as a path (`.\angular`).
+The menu and the list of options go to stderr, so stdout only ever carries the report. In the menu, an empty answer or `q` cancels (exit code `2`).
+
+A project of profile `node` or `angular` whose folder has no `package.json` gets a single failure (`config/project`) instead of one per check.
 
 Profiles extend each other: `core` < `node` < `angular`. Exit code `0` when every check passes, `1` when any check fails, `2` on invalid usage or an invalid manifest. Run `npm test` to execute the test suite.
 
@@ -57,6 +57,7 @@ Colors only wrap the text, so the report is the same once they are removed. Unkn
 - `profile` is one of the available profiles.
 - `name` is optional (defaults to the path) and is what `--project` receives. Names and folders must be unique.
 - Unknown keys are rejected, so a typo does not go unnoticed.
+- The file may contain comments and trailing commas, like a hand-written `tsconfig.json`.
 
 ## Checks
 

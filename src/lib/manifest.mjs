@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { readJson } from './files.mjs';
+import { readText } from './files.mjs';
+import { parseJsonc } from './jsonc.mjs';
 
 export const MANIFEST_FILE = '.miyr.json';
 
@@ -28,7 +29,7 @@ export function loadManifest(dir, profileNames) {
 
   let data;
   try {
-    data = readJson(file);
+    data = parseJsonc(readText(file));
   } catch (err) {
     return { error: `${MANIFEST_FILE} inválido: ${err.message}` };
   }

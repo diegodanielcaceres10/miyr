@@ -1,35 +1,7 @@
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
-
-/**
- * Dependency-free JSONC parser (// and block comments, trailing commas, BOM).
- * It does not rely on the TypeScript API, so it works with any compiler version.
- */
-export function parseJsonc(text) {
-  let out = '';
-  let inString = false;
-  const src = text.replace(/^\uFEFF/, '');
-
-  for (let i = 0; i < src.length; i++) {
-    const c = src[i];
-    const next = src[i + 1];
-
-    if (inString) {
-      out += c;
-      if (c === '\\') out += src[++i] ?? '';
-      else if (c === '"') inString = false;
-      continue;
-    }
-    if (c === '"') { inString = true; out += c; continue; }
-    if (c === '/' && next === '/') { while (i < src.length && src[i] !== '\n') i++; out += '\n'; continue; }
-    if (c === '/' && next === '*') { i += 2; while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++; i++; continue; }
-    // Comments are already gone, so a trailing comma is the last non-space char in `out`.
-    if (c === '}' || c === ']') out = out.replace(/,\s*$/, '');
-    out += c;
-  }
-  return JSON.parse(out);
-}
+import { parseJsonc } from './jsonc.mjs';
 
 function resolveExtends(spec, fromDir) {
   if (spec.startsWith('.') || path.isAbsolute(spec)) {

@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import * as ciWorkflow from './ci/workflow.mjs';
 import * as dependencies from './config/dependencies.mjs';
 import * as editorconfig from './config/editorconfig.mjs';
@@ -37,8 +39,23 @@ export const profiles = Object.fromEntries(
   Object.entries(LEVELS).map(([name, levels]) => [name, checks.filter((check) => levels.includes(check.profile))]),
 );
 
+// Profiles whose checks all read package.json. Without it they would fail one by one for a single cause.
+const NEEDS_PACKAGE_JSON = new Set(['node', 'angular']);
+
 export function runAudit(profile, ctx) {
   const selected = profiles[profile];
   if (!selected) throw new Error(`Perfil desconocido: ${profile}`);
+  if (NEEDS_PACKAGE_JSON.has(profile) && !fs.existsSync(path.join(ctx.cwd, 'package.json'))) {
+    return [
+      {
+        id: 'config/project',
+        title: 'Carpeta del proyecto',
+        status: 'fail',
+        severity: 'high',
+        message: `No hay package.json en ${ctx.cwd}: no parece un proyecto ${profile}.`,
+        fix: 'Revisa "path" y "profile" de este proyecto en .miyr.json.',
+      },
+    ];
+  }
   return selected.map((check) => check.run(ctx));
 }
