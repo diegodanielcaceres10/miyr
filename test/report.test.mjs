@@ -65,6 +65,14 @@ test('failing checks always show the message, the evidence and the fix', () => {
   assert.match(text, /- x: false \(tsconfig\.json\)/);
 });
 
+test('detail lines of a failing check are listed under it, and hidden for passing ones', () => {
+  const detailed = { ...fail, evidence: { details: ['@angular/router 21.0.0', '@angular/cli 20.1.0'] } };
+  const text = formatText(one([detailed]));
+  assert.match(text, /^ {9}- @angular\/router 21\.0\.0$/m);
+  assert.match(text, /^ {9}- @angular\/cli 20\.1\.0$/m);
+  assert.doesNotMatch(formatText(one([{ ...pass, evidence: { details: ['oculto'] } }]), { verbose: true }), /oculto/);
+});
+
 test('colors only wrap text and never change it', () => {
   const results = [pass, fail, error, docs];
   const plain = formatText(one(results));

@@ -65,6 +65,7 @@ export function formatText({ projects }, { color = false, verbose = false } = {}
         if (result.status !== 'pass' || verbose) lines.push(`         ${result.message}`);
         if (result.status === 'pass') continue;
         for (const item of result.evidence?.weakened ?? []) lines.push(`         - ${item}`);
+        for (const item of result.evidence?.details ?? []) lines.push(`         - ${item}`);
         if (result.fix) lines.push(`         -> ${result.fix}`);
       }
     }

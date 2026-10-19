@@ -1,13 +1,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { profiles } from '../src/audits/index.mjs';
-import { EDITORCONFIG, MIT, README, completeProject, completeRepo, nodeProjectFiles, project } from '../test-support/project.mjs';
+import { EDITORCONFIG, MIT, README, completeProject, completeRepo, lockfile, nodeProjectFiles, project } from '../test-support/project.mjs';
+import { startRegistry } from '../test-support/registry.mjs';
 
 const bin = path.resolve('bin/miyr.mjs');
 const cliWith = (options, ...args) => spawnSync(process.execPath, [bin, ...args], { encoding: 'utf8', ...options });
 const cli = (...args) => cliWith({}, ...args);
+// Asynchronous on purpose: a local registry in this process can only answer while the event loop is free.
+const cliAsync = (args, env = {}) =>
+  new Promise((resolve) => {
+    const child = spawn(process.execPath, [bin, ...args], { env: { ...process.env, ...env } });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => (stdout += chunk));
+    child.stderr.on('data', (chunk) => (stderr += chunk));
+    child.on('close', (status) => resolve({ status, stdout, stderr }));
+    child.stdin.end();
+  });
 
 const asProfile = (profile) => ({ projects: [{ path: '.', profile }] });
 const TWO = {
@@ -279,7 +291,7 @@ test('--json prints the root and one entry per project with its results', () => 
   const [only] = report.projects;
   assert.deepEqual([only.name, only.path, only.profile], ['web', 'web', 'angular']);
   assert.equal(only.results.length, profiles.angular.length);
-  assert.ok(only.results.every((r) => r.status === 'pass'));
+  assert.ok(only.results.every((r) => r.status === 'pass' || r.status === 'skip'));
 });
 
 test('text output has a header and a summary line that can be copied', () => {
@@ -336,4 +348,91 @@ test('--json carries the severity of every result', () => {
   assert.equal(byId['config/lockfile'].severity, 'critical');
   assert.equal(byId['config/package-scripts'].severity, 'high');
   assert.equal(byId['config/package-scripts'].status, 'pass');
+});
+
+// --- the Angular version check: skipped by default, compared with the latest stable under --online
+
+const withLock = (versions) => completeRepo({ 'web/package-lock.json': lockfile(versions) });
+
+test('by default the Angular version is not compared: it shows as SKIP and does not fail the run', () => {
+  const result = cli('audit', completeRepo());
+  assert.equal(result.status, 0, result.stdout);
+  assert.match(result.stdout, /\[SKIP\] Angular en la última versión estable \(config\/angular-version\)/);
+  assert.match(result.stdout, /--online/);
+  assert.match(result.stdout, /Resumen: \d+ OK, 0 FAIL, 0 ERR, 1 SKIP/);
+});
+
+test('--online compares with the latest stable and passes on the same major', async () => {
+  const registry = await startRegistry({ latest: '22.9.9' });
+  try {
+    const result = await cliAsync(['audit', '--online', '--verbose', completeRepo()], { MIYR_REGISTRY_URL: registry.url });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /\[OK {2}\] Angular en la última versión estable/);
+    assert.match(result.stdout, /22\.9\.9/);
+    assert.doesNotMatch(result.stdout, /SKIP/);
+  } finally {
+    await registry.close();
+  }
+});
+
+test('--online fails when the project is a major behind, showing both versions and the severity', async () => {
+  const registry = await startRegistry({ latest: '22.9.9' });
+  try {
+    const result = await cliAsync(['audit', '--online', withLock({ '@angular/core': '21.4.0', '@angular/router': '21.4.0' })], { MIYR_REGISTRY_URL: registry.url });
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /\[FAIL\] Angular en la última versión estable \(config\/angular-version\) \[media\]/);
+    assert.match(result.stdout, /21\.4\.0/);
+    assert.match(result.stdout, /22\.9\.9/);
+  } finally {
+    await registry.close();
+  }
+});
+
+test('--online reports an unreachable registry as an error', async () => {
+  const registry = await startRegistry({});
+  const url = registry.url;
+  await registry.close();
+  const result = await cliAsync(['audit', '--online', completeRepo()], { MIYR_REGISTRY_URL: url });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /\[ERR \] Angular en la última versión estable/);
+});
+
+test('--online asks the registry once, however many Angular projects there are', async () => {
+  const registry = await startRegistry({ latest: '22.9.9' });
+  try {
+    const manifest = { projects: [{ name: 'web', path: 'web', profile: 'angular' }, { name: 'dashboard', path: 'dashboard', profile: 'angular' }] };
+    const root = completeRepo({ '.miyr.json': manifest, 'dashboard/tsconfig.json': { compilerOptions: { strict: true } }, ...nodeProjectFiles('dashboard') });
+    const result = await cliAsync(['audit', '--online', '--all', root], { MIYR_REGISTRY_URL: registry.url });
+    assert.match(result.stdout, /== web /);
+    assert.match(result.stdout, /== dashboard /);
+    assert.equal(registry.requests.length, 1);
+  } finally {
+    await registry.close();
+  }
+});
+
+test('--online makes no request when no selected project needs it', async () => {
+  const registry = await startRegistry({});
+  try {
+    const root = completeRepo({ '.miyr.json': { projects: [{ name: 'web', path: 'web', profile: 'node' }] } });
+    const result = await cliAsync(['audit', '--online', root], { MIYR_REGISTRY_URL: registry.url });
+    assert.equal(result.status, 0, result.stdout);
+    assert.deepEqual(registry.requests, []);
+  } finally {
+    await registry.close();
+  }
+});
+
+test('without --online the registry is never contacted', async () => {
+  const registry = await startRegistry({});
+  try {
+    await cliAsync(['audit', completeRepo()], { MIYR_REGISTRY_URL: registry.url });
+    assert.deepEqual(registry.requests, []);
+  } finally {
+    await registry.close();
+  }
+});
+
+test('the usage text mentions --online', () => {
+  assert.match(cli('audit', '--bogus').stderr, /--online/);
 });

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as ciWorkflow from './ci/workflow.mjs';
+import * as angularVersion from './config/angular-version.mjs';
 import * as dependencies from './config/dependencies.mjs';
 import * as editorconfig from './config/editorconfig.mjs';
 import * as gitignore from './config/gitignore.mjs';
@@ -26,6 +27,7 @@ const checks = sortByLevel([
   lockfile,
   nodeVersion,
   dependencies,
+  angularVersion,
   packageScripts,
   typescriptStrict,
   ciWorkflow,
@@ -65,5 +67,14 @@ export function runAudit(profile, ctx) {
       },
     ];
   }
-  return selected.map((check) => ({ ...check.run(ctx), severity: SEVERITY[check.level] }));
+  // A result may set its own severity; otherwise it takes the one of its check's level.
+  return selected.map((check) => {
+    const result = check.run(ctx);
+    return { ...result, severity: result.severity ?? SEVERITY[check.level] };
+  });
+}
+
+/** Packages whose latest stable version the given profiles need, without duplicates. */
+export function latestPackagesFor(profileNames) {
+  return [...new Set(profileNames.flatMap((name) => profiles[name].flatMap((check) => check.latestPackages ?? [])))];
 }

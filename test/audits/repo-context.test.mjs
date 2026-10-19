@@ -20,7 +20,7 @@ const at = (overrides) => {
 
 test('a repository with repo-level files at the root passes every angular check', () => {
   const results = runAudit('angular', at({}));
-  assert.deepEqual(results.filter((r) => r.status !== 'pass').map((r) => `${r.id}: ${r.message}`), []);
+  assert.deepEqual(results.filter((r) => r.status !== 'pass' && r.status !== 'skip').map((r) => `${r.id}: ${r.message}`), []);
 });
 
 test('editorconfig: uses the root file and prefers the nearest one', () => {

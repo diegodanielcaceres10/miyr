@@ -28,12 +28,19 @@ Profiles extend each other: `core` < `node` < `angular`. Exit code `0` when ever
 
 Repository-level files are looked up to the repository root, which is the nearest folder with `.git` above the folder given. Project files (`package.json`, lockfile, `tsconfig.json`) are read from the project folder. Searched from the project folder up to the repository root, nearest first: `README`, `LICENSE`, `.editorconfig`, `.nvmrc`, and every `.gitignore` in the chain. Workflows are only read from `<root>/.github/workflows`, as GitHub does.
 
+### Network (`--online`)
+
+By default miyr works only on your files, so a run is reproducible. A few checks can only be answered with outside data; they are skipped (`[SKIP]`) unless you pass `--online`. Today there is one: `config/angular-version`, which asks the npm registry for the latest stable version of `@angular/core` (the `latest` dist-tag, so prereleases never count). Only the public package name is sent; no code or results leave your machine. The registry is asked once per run, however many projects are audited, and only if a selected project needs it.
+
+With `--online`, an unreachable or invalid registry is reported as an error (`[ERR ]`) rather than silently skipped, because you asked for the comparison. Set `MIYR_REGISTRY_URL` to use another registry, such as a corporate mirror.
+
 ### Output
 
 The text report has one block per project, grouped by area (Configuración, Tipado, CI/CD, Documentación). Every check shows its status, its title and its stable id, so you can refer to it, for example `config/node-version`. Passing checks take a single line; failures always show the message, the evidence and the suggested fix, and their severity in brackets (`[crítica]`, `[alta]`, `[media]` or `[baja]`). A `[SKIP]` check could not be verified (for example, it needs the network); it shows why, does not fail the run and is counted apart. The last line is a `Resumen` with the totals.
 
 | Option | Effect |
 |---|---|
+| `--online` | Let checks that need it query the npm registry (see below). Without it miyr never uses the network |
 | `--verbose` | Also show the message of passing checks |
 | `--color` / `--no-color` | Force or disable colors. By default they are used only on a terminal, and never when `NO_COLOR` is set |
 | `--json` | Print `{ root, projects: [{ name, path, profile, results }] }`, never colored |
@@ -78,6 +85,7 @@ The levels of `typing`, `ci` and `docs` checks are provisional until those areas
 | `config/lockfile` | node | A | A single lockfile, committed, consistent with `packageManager` |
 | `config/node-version` | node | A | `engines.node`, a `.nvmrc` or `.node-version` file, and `packageManager` |
 | `config/dependencies` | node | A | No `*`/`latest` ranges, no duplicates, no dev tooling in `dependencies` |
+| `config/angular-version` | angular | B | `@angular/core` is on the same major as the latest stable (needs `--online`; otherwise skipped, showing the version found). Fails, naming both versions and how many majors behind (medium severity for one, high for two or more). Also fails when another `@angular/*` package is on a different major. Reads the version from `package-lock.json`, or the declared range if there is none |
 | `config/package-scripts` | node | B | `start`, `build`, `test` and `lint` scripts exist in `package.json` |
 | `typing/typescript-strict` | angular | B | Effective `strict: true` without weakened flags |
 | `ci/workflow` | node | B | A workflow on `push` or `pull_request` that runs lint, test and build |

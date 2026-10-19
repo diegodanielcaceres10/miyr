@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LEVELS, SEVERITY, profiles, runAudit, sortByLevel } from '../../src/audits/index.mjs';
-import { completeProject, project } from '../../test-support/project.mjs';
+import { LEVELS, SEVERITY, latestPackagesFor, profiles, runAudit, sortByLevel } from '../../src/audits/index.mjs';
+import { completeProject, lockfile, project } from '../../test-support/project.mjs';
 
 const ids = (profile) => profiles[profile].map((check) => check.id);
 
@@ -44,7 +44,7 @@ test('every check declares a title, a profile and a run function', () => {
 test('runAudit returns one passing result per check on a complete project', () => {
   const results = runAudit('angular', { cwd: completeProject() });
   assert.deepEqual(results.map((r) => r.id), ids('angular'));
-  const failing = results.filter((r) => r.status !== 'pass').map((r) => `${r.id}: ${r.message}`);
+  const failing = results.filter((r) => r.status !== 'pass' && r.status !== 'skip').map((r) => `${r.id}: ${r.message}`);
   assert.deepEqual(failing, []);
 });
 
@@ -109,12 +109,13 @@ test('the configuration checks follow the agreed order of importance', () => {
     'config/lockfile',
     'config/node-version',
     'config/dependencies',
+    'config/angular-version',
     'config/package-scripts',
     'config/gitignore',
     'config/package-metadata',
     'config/editorconfig',
   ]);
-  assert.deepEqual(config('node'), config('angular'));
+  assert.deepEqual(config('node'), config('angular').filter((id) => id !== 'config/angular-version'));
   assert.deepEqual(config('core'), ['config/editorconfig']);
 });
 
@@ -127,4 +128,20 @@ test('sortByLevel orders by level, keeps the given order inside a level and does
   const given = [{ id: 'd1', level: 'D' }, { id: 'a1', level: 'A' }, { id: 'b1', level: 'B' }, { id: 'a2', level: 'A' }];
   assert.deepEqual(sortByLevel(given).map((c) => c.id), ['a1', 'a2', 'b1', 'd1']);
   assert.deepEqual(given.map((c) => c.id), ['d1', 'a1', 'b1', 'a2']);
+});
+
+test('a result may carry its own severity; otherwise it takes the one of its level', async () => {
+  const cwd = completeProject({ 'package-lock.json': lockfile({ '@angular/core': '21.0.0', '@angular/router': '21.0.0' }) });
+  const ctx = { cwd, online: true, latest: { '@angular/core': { version: '22.2.3' } } };
+  const byId = Object.fromEntries(runAudit('angular', ctx).map((r) => [r.id, r]));
+  assert.equal(byId['config/angular-version'].status, 'fail');
+  assert.equal(byId['config/angular-version'].severity, 'medium');
+  assert.equal(byId['config/lockfile'].severity, 'critical');
+});
+
+test('latestPackagesFor lists the packages whose latest version the profiles need', () => {
+  assert.deepEqual(latestPackagesFor(['angular']), ['@angular/core']);
+  assert.deepEqual(latestPackagesFor(['angular', 'angular']), ['@angular/core']);
+  assert.deepEqual(latestPackagesFor(['node', 'core']), []);
+  assert.deepEqual(latestPackagesFor([]), []);
 });

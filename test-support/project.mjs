@@ -55,6 +55,13 @@ of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction.
 `;
 
+/** A package-lock.json (v3) that resolves the given package versions. */
+export function lockfile(versions = { '@angular/core': '22.2.1', '@angular/router': '22.2.1' }) {
+  const packages = { '': { name: 'app', version: '0.0.0' } };
+  for (const [name, version] of Object.entries(versions)) packages[`node_modules/${name}`] = { version };
+  return { name: 'app', version: '0.0.0', lockfileVersion: 3, packages };
+}
+
 function defaultFiles() {
   return {
     '.git/HEAD': 'ref: refs/heads/main\n',
@@ -65,10 +72,11 @@ function defaultFiles() {
       license: 'MIT',
       engines: { node: '>=20' },
       packageManager: 'npm@10.9.0',
+      dependencies: { '@angular/core': '^22.0.0', '@angular/router': '^22.0.0' },
       scripts: { start: 'ng serve', build: 'ng build', test: 'ng test', lint: 'ng lint' },
     },
     '.nvmrc': '22\n',
-    'package-lock.json': '{}',
+    'package-lock.json': lockfile(),
     '.gitignore': 'node_modules\ndist\n.angular\n',
     '.editorconfig': EDITORCONFIG,
     'README.md': README,

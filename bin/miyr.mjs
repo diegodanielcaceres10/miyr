@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { profiles, runAudit } from '../src/audits/index.mjs';
+import { latestPackagesFor, profiles, runAudit } from '../src/audits/index.mjs';
 import { findRepoRoot } from '../src/lib/context.mjs';
 import { MANIFEST_FILE, loadManifest, missingManifestMessage } from '../src/lib/manifest.mjs';
+import { fetchLatest } from '../src/lib/registry.mjs';
 import { chooseProject } from '../src/prompt.mjs';
 import { exitCodeFor, formatChoices, formatText } from '../src/report.mjs';
 
@@ -11,7 +12,7 @@ const USAGE = `Uso:
   miyr audit [carpeta] [--project <nombre> | --all | --choose]
 Audita los proyectos que declara el ${MANIFEST_FILE} de esa carpeta (sin carpeta, la actual).
 --cwd <carpeta> equivale a pasarla como argumento. El perfil de cada proyecto se declara en el manifiesto.
-Opciones: --json  --verbose  --color  --no-color`;
+Opciones: --online (consulta el registro de npm)  --json  --verbose  --color  --no-color`;
 
 const fail = (message, withUsage = false) => {
   console.error(withUsage ? `${message}\n\n${USAGE}` : message);
@@ -22,7 +23,7 @@ const args = process.argv.slice(2);
 if (args[0] !== 'audit') fail('Comando desconocido o ausente.', true);
 
 const VALUE_OPTIONS = ['cwd', 'project'];
-const FLAGS = ['json', 'verbose', 'color', 'no-color', 'all', 'choose'];
+const FLAGS = ['json', 'verbose', 'color', 'no-color', 'all', 'choose', 'online'];
 const options = {};
 const flags = new Set();
 const positional = [];
@@ -89,13 +90,17 @@ if (options.project !== undefined) {
   fail(formatChoices(projects, { folder }));
 }
 
+// Only with --online, and only for what the selected profiles need: the one place that uses the network.
+const online = flags.has('online');
+const latest = online ? await fetchLatest(latestPackagesFor([...new Set(targets.map((t) => t.profile))])) : undefined;
+
 const report = {
   root,
   projects: targets.map((t) => ({
     name: t.name,
     path: t.path,
     profile: t.profile,
-    results: runAudit(t.profile, { cwd: t.dir, root }),
+    results: runAudit(t.profile, { cwd: t.dir, root, online, latest }),
   })),
 };
 
