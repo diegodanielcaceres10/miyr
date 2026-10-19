@@ -6,6 +6,7 @@ import { loadPackage } from '../../lib/package-json.mjs';
 export const id = 'config/package-metadata';
 export const title = 'Metadatos de package.json';
 export const profile = 'node';
+export const level = 'D';
 
 // Text signatures of common licenses, used to compare package.json with the LICENSE file.
 const SIGNATURES = {
@@ -25,7 +26,7 @@ const PUBLISHABLE_KEYS = ['main', 'module', 'exports', 'bin', 'types'];
 
 export function run(ctx) {
   const { pkg, failure } = loadPackage(ctx.cwd);
-  if (failure) return { id, title, severity: 'medium', ...failure };
+  if (failure) return { id, title, ...failure };
 
   const problems = [];
   if (typeof pkg.name !== 'string' || pkg.name.trim() === '') problems.push('name');
@@ -46,11 +47,11 @@ export function run(ctx) {
 
   if (problems.length > 0) {
     return {
-      id, title, status: 'fail', severity: 'medium', evidence: { problems },
+      id, title, status: 'fail', evidence: { problems },
       message: `Metadatos incompletos o incoherentes: ${problems.join(', ')}.`,
       fix: 'Completa esos campos en package.json y alinea "license" con el archivo LICENSE.',
     };
   }
 
-  return { id, title, status: 'pass', severity: 'medium', message: 'Metadatos de package.json correctos.' };
+  return { id, title, status: 'pass', message: 'Metadatos de package.json correctos.' };
 }

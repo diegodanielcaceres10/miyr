@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatChoices, formatText, groupByArea, projectRows, summarize } from '../src/report.mjs';
+import { exitCodeFor, formatChoices, formatText, groupByArea, projectRows, summarize } from '../src/report.mjs';
 
 const pass = { id: 'config/one', title: 'Uno', status: 'pass', message: 'todo bien' };
 const fail = { id: 'config/two', title: 'Dos', status: 'fail', message: 'algo mal', fix: 'arréglalo' };
@@ -8,13 +8,16 @@ const error = { id: 'typing/three', title: 'Tres', status: 'error', message: 'ro
 const weakened = { id: 'typing/four', title: 'Cuatro', status: 'fail', message: 'débil', evidence: { weakened: ['x: false (tsconfig.json)'] } };
 const docs = { id: 'docs/five', title: 'Cinco', status: 'pass', message: 'ok' };
 const ci = { id: 'ci/six', title: 'Seis', status: 'fail', message: 'sin CI' };
+const skip = { id: 'config/seven', title: 'Siete', status: 'skip', message: 'no se consultó el registro', fix: 'usa --online', severity: 'high' };
+const withSeverity = (result, severity) => ({ ...result, severity });
 
 const one = (results) => ({ projects: [{ name: 'web', path: 'web', profile: 'angular', results }] });
 const stripAnsi = (text) => text.replace(/\u001b\[[0-9;]*m/g, '');
 
 test('summarize counts results by status', () => {
-  assert.deepEqual(summarize([pass, pass, fail, error]), { pass: 2, fail: 1, error: 1 });
-  assert.deepEqual(summarize([]), { pass: 0, fail: 0, error: 0 });
+  assert.deepEqual(summarize([pass, pass, fail, error]), { pass: 2, fail: 1, error: 1, skip: 0 });
+  assert.deepEqual(summarize([]), { pass: 0, fail: 0, error: 0, skip: 0 });
+  assert.deepEqual(summarize([pass, skip, skip]), { pass: 1, fail: 0, error: 0, skip: 2 });
 });
 
 test('groupByArea follows the fixed area order, whatever the order of the results', () => {
@@ -112,4 +115,50 @@ test('formatChoices quotes a folder that contains spaces and omits it when none 
 
 test('projectRows aligns name, profile and folder without indentation', () => {
   assert.deepEqual(projectRows(PROJECTS), ['web        angular  web', 'dashboard  node     apps/dashboard']);
+});
+
+test('a skipped check is shown with its message and fix, and counted apart', () => {
+  const text = formatText(one([pass, skip]));
+  assert.match(text, /\[SKIP\] Siete \(config\/seven\)/);
+  assert.match(text, /no se consultó el registro/);
+  assert.match(text, /-> usa --online/);
+  assert.match(text, /^Configuración: 1 OK, 1 SKIP$/m);
+});
+
+test('the summary mentions skipped checks only when there are some', () => {
+  assert.match(formatText(one([pass, skip])), /Resumen: 1 OK, 0 FAIL, 0 ERR, 1 SKIP/);
+  assert.doesNotMatch(formatText(one([pass, fail])), /SKIP/);
+});
+
+test('failures and errors show their severity in Spanish, passing and skipped checks do not', () => {
+  const labels = { critical: 'crítica', high: 'alta', medium: 'media', low: 'baja' };
+  for (const [severity, label] of Object.entries(labels)) {
+    const text = formatText(one([withSeverity(fail, severity), withSeverity(error, severity)]));
+    assert.match(text, new RegExp(`\\[FAIL\\] Dos \\(config/two\\) \\[${label}\\]`), severity);
+    assert.match(text, new RegExp(`\\[ERR \\] Tres \\(typing/three\\) \\[${label}\\]`), severity);
+  }
+  const quiet = formatText(one([withSeverity(pass, 'critical'), skip]));
+  assert.doesNotMatch(quiet, /\[(crítica|alta|media|baja)\]/);
+});
+
+test('a failure without severity prints no label', () => {
+  assert.doesNotMatch(formatText(one([fail])), /\[(crítica|alta|media|baja)\]/);
+});
+
+test('severity is colored by gravity and colors still never change the text', () => {
+  const results = [withSeverity(fail, 'critical'), withSeverity(ci, 'low')];
+  const colored = formatText(one(results), { color: true });
+  assert.match(colored, /\u001b\[1;31m\[crítica\]/);
+  assert.match(colored, /\u001b\[2m\[baja\]/);
+  assert.equal(stripAnsi(colored), formatText(one(results)));
+});
+
+test('exitCodeFor is 0 when every check passes or is skipped, and 1 on any failure or error', () => {
+  const projects = (results) => [{ results }];
+  assert.equal(exitCodeFor(projects([pass, pass])), 0);
+  assert.equal(exitCodeFor(projects([pass, skip])), 0);
+  assert.equal(exitCodeFor(projects([skip])), 0);
+  assert.equal(exitCodeFor(projects([pass, fail])), 1);
+  assert.equal(exitCodeFor(projects([pass, error])), 1);
+  assert.equal(exitCodeFor([...projects([pass]), ...projects([skip, fail])]), 1);
 });

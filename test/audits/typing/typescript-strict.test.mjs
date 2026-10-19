@@ -28,7 +28,6 @@ test('errors when tsconfig.json is not valid JSONC', () => {
 test('fails when strict is not set', () => {
   const result = run({ cwd: project({ 'tsconfig.json': { compilerOptions: { target: 'ES2022' } } }) });
   assert.equal(result.status, 'fail');
-  assert.equal(result.severity, 'high');
 });
 
 test('fails when strict is explicitly false', () => {
@@ -66,7 +65,6 @@ test('fails when strict is true but individual flags are weakened', () => {
   });
   const result = run({ cwd });
   assert.equal(result.status, 'fail');
-  assert.equal(result.severity, 'medium');
   assert.match(result.message, /noImplicitAny/);
   assert.match(result.message, /strictNullChecks/);
   assert.equal(result.evidence.weakened.length, 2);

@@ -5,7 +5,7 @@ import { profiles, runAudit } from '../src/audits/index.mjs';
 import { findRepoRoot } from '../src/lib/context.mjs';
 import { MANIFEST_FILE, loadManifest, missingManifestMessage } from '../src/lib/manifest.mjs';
 import { chooseProject } from '../src/prompt.mjs';
-import { formatChoices, formatText } from '../src/report.mjs';
+import { exitCodeFor, formatChoices, formatText } from '../src/report.mjs';
 
 const USAGE = `Uso:
   miyr audit [carpeta] [--project <nombre> | --all | --choose]
@@ -102,4 +102,4 @@ const report = {
 // Colors only on a real terminal (or when forced), and never when NO_COLOR is set.
 const color = !flags.has('no-color') && (flags.has('color') || (process.stdout.isTTY && !process.env.NO_COLOR && process.env.TERM !== 'dumb'));
 console.log(flags.has('json') ? JSON.stringify(report, null, 2) : formatText(report, { color, verbose: flags.has('verbose') }));
-process.exitCode = report.projects.every((p) => p.results.every((r) => r.status === 'pass')) ? 0 : 1;
+process.exitCode = exitCodeFor(report.projects);

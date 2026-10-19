@@ -6,6 +6,7 @@ import { loadPackage } from '../../lib/package-json.mjs';
 export const id = 'config/lockfile';
 export const title = 'Un único lockfile versionado';
 export const profile = 'node';
+export const level = 'A';
 
 const LOCKFILES = {
   'package-lock.json': 'npm',
@@ -15,7 +16,7 @@ const LOCKFILES = {
   'bun.lockb': 'bun',
 };
 
-const fail = (message, fix, evidence) => ({ id, title, status: 'fail', severity: 'high', message, fix, evidence });
+const fail = (message, fix, evidence) => ({ id, title, status: 'fail', message, fix, evidence });
 
 export function run(ctx) {
   const { cwd } = ctx;
@@ -42,5 +43,5 @@ export function run(ctx) {
     return fail(`packageManager declara ${declared} pero el lockfile es de ${actual} (${present[0]}).`, 'Alinea packageManager con el lockfile.', { declared, actual });
   }
 
-  return { id, title, status: 'pass', severity: 'high', evidence: { lockfile: present[0] }, message: `Lockfile único: ${present[0]}.` };
+  return { id, title, status: 'pass', evidence: { lockfile: present[0] }, message: `Lockfile único: ${present[0]}.` };
 }

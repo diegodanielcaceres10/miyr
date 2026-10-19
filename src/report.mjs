@@ -8,13 +8,15 @@ const AREAS = [
   ['docs', 'Documentación'],
 ];
 
-const LABEL = { pass: 'OK  ', fail: 'FAIL', error: 'ERR ' };
-const STATUS_COLOR = { pass: '32', fail: '31', error: '33' }; // green, red, yellow
+const LABEL = { pass: 'OK  ', fail: 'FAIL', error: 'ERR ', skip: 'SKIP' };
+const STATUS_COLOR = { pass: '32', fail: '31', error: '33', skip: '36' }; // green, red, yellow, cyan
+const SEVERITY_LABEL = { critical: 'crítica', high: 'alta', medium: 'media', low: 'baja' };
+const SEVERITY_COLOR = { critical: '1;31', high: '31', medium: '33', low: '2' }; // bold red, red, yellow, dim
 const BOLD = '1';
 const DIM = '2';
 
 export function summarize(results) {
-  const counts = { pass: 0, fail: 0, error: 0 };
+  const counts = { pass: 0, fail: 0, error: 0, skip: 0 };
   for (const result of results) counts[result.status] += 1;
   return counts;
 }
@@ -35,8 +37,8 @@ export function groupByArea(results) {
   return [...known.values(), ...extra.values()].filter((group) => group.results.length > 0);
 }
 
-function counts({ pass, fail, error }) {
-  return [pass && `${pass} OK`, fail && `${fail} FAIL`, error && `${error} ERR`].filter(Boolean).join(', ');
+function counts({ pass, fail, error, skip }) {
+  return [pass && `${pass} OK`, fail && `${fail} FAIL`, error && `${error} ERR`, skip && `${skip} SKIP`].filter(Boolean).join(', ');
 }
 
 /**
@@ -57,7 +59,9 @@ export function formatText({ projects }, { color = false, verbose = false } = {}
       lines.push(paint(BOLD, `${group.label}: ${counts(summarize(group.results))}`));
       for (const result of group.results) {
         const status = paint(STATUS_COLOR[result.status], `[${LABEL[result.status]}]`);
-        lines.push(`  ${status} ${result.title} ${paint(DIM, `(${result.id})`)}`);
+        const severity = SEVERITY_LABEL[result.severity];
+        const tag = severity && (result.status === 'fail' || result.status === 'error') ? ` ${paint(SEVERITY_COLOR[result.severity], `[${severity}]`)}` : '';
+        lines.push(`  ${status} ${result.title} ${paint(DIM, `(${result.id})`)}${tag}`);
         if (result.status !== 'pass' || verbose) lines.push(`         ${result.message}`);
         if (result.status === 'pass') continue;
         for (const item of result.evidence?.weakened ?? []) lines.push(`         - ${item}`);
@@ -65,9 +69,9 @@ export function formatText({ projects }, { color = false, verbose = false } = {}
       }
     }
 
-    const { pass, fail, error } = summarize(project.results);
+    const { pass, fail, error, skip } = summarize(project.results);
     lines.push('');
-    lines.push(`Resumen: ${pass} OK, ${fail} FAIL, ${error} ERR`);
+    lines.push(`Resumen: ${pass} OK, ${fail} FAIL, ${error} ERR${skip > 0 ? `, ${skip} SKIP` : ''}`);
   }
   return lines.join('\n');
 }
@@ -92,4 +96,9 @@ export function formatChoices(projects, { folder } = {}) {
     `Uno:    node bin/miyr.mjs audit --project ${projects[0].name}${target}`,
     `Todos:  node bin/miyr.mjs audit --all${target}`,
   ].join('\n');
+}
+
+/** 0 when every check passed or was skipped (not verified), 1 when any failed or errored. */
+export function exitCodeFor(projects) {
+  return projects.every((project) => project.results.every((r) => r.status === 'pass' || r.status === 'skip')) ? 0 : 1;
 }

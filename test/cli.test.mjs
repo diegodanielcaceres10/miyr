@@ -318,3 +318,22 @@ test('colors do not change the text', () => {
   const root = failingRepo();
   assert.equal(strip(cli('audit', root, '--color').stdout), cli('audit', root).stdout);
 });
+
+// --- severity and order in the report
+
+test('failures show their severity and the most important one is listed first', () => {
+  const root = completeRepo({ 'web/package-lock.json': null, '.editorconfig': null });
+  const { stdout } = cli('audit', root);
+  assert.match(stdout, /\(config\/lockfile\) \[crítica\]/);
+  assert.match(stdout, /\(config\/editorconfig\) \[baja\]/);
+  assert.ok(stdout.indexOf('config/lockfile') < stdout.indexOf('config/editorconfig'));
+});
+
+test('--json carries the severity of every result', () => {
+  const root = completeRepo({ 'web/package-lock.json': null });
+  const [web] = JSON.parse(cli('audit', '--json', root).stdout).projects;
+  const byId = Object.fromEntries(web.results.map((r) => [r.id, r]));
+  assert.equal(byId['config/lockfile'].severity, 'critical');
+  assert.equal(byId['config/package-scripts'].severity, 'high');
+  assert.equal(byId['config/package-scripts'].status, 'pass');
+});

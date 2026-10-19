@@ -5,6 +5,7 @@ import { readText } from '../../lib/files.mjs';
 export const id = 'ci/workflow';
 export const title = 'Workflow de CI con lint, test y build';
 export const profile = 'node';
+export const level = 'B';
 
 const PM = String.raw`(?:npm|pnpm|yarn|bun)`;
 const STEPS = {
@@ -58,7 +59,7 @@ export function run({ cwd, root = cwd }) {
   const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.ya?ml$/i.test(f)) : [];
   if (files.length === 0) {
     return {
-      id, title, status: 'fail', severity: 'high',
+      id, title, status: 'fail',
       message: 'No hay workflows en .github/workflows de la raíz del repo.',
       fix: 'Crea un workflow que se ejecute en push o pull_request y corra lint, test y build.',
     };
@@ -78,7 +79,7 @@ export function run({ cwd, root = cwd }) {
 
   if (used.length === 0) {
     return {
-      id, title, status: 'fail', severity: 'high',
+      id, title, status: 'fail',
       message: 'Ningún workflow se dispara con push o pull_request.',
       fix: 'Añade push o pull_request a la sección "on" del workflow.',
     };
@@ -87,11 +88,11 @@ export function run({ cwd, root = cwd }) {
   const missing = Object.keys(STEPS).filter((step) => !found.has(step));
   if (missing.length > 0) {
     return {
-      id, title, status: 'fail', severity: 'high', evidence: { workflows: used, missing },
+      id, title, status: 'fail', evidence: { workflows: used, missing },
       message: `El CI no ejecuta: ${missing.join(', ')}.`,
       fix: 'Añade un paso "run" para cada uno en un workflow disparado por push o pull_request.',
     };
   }
 
-  return { id, title, status: 'pass', severity: 'high', evidence: { workflows: used }, message: 'CI con lint, test y build.' };
+  return { id, title, status: 'pass', evidence: { workflows: used }, message: 'CI con lint, test y build.' };
 }

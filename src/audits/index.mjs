@@ -12,31 +12,39 @@ import * as license from './docs/license.mjs';
 import * as readme from './docs/readme.mjs';
 import * as typescriptStrict from './typing/typescript-strict.mjs';
 
-// Checks live in one folder per area (config, typing, ci, docs). Each one declares the
-// profile it belongs to; register new checks here, grouped by area.
-const checks = [
-  editorconfig,
-  packageScripts,
-  nodeVersion,
+// Checks live in one folder per area (config, typing, ci, docs). Each one declares the profile it belongs
+// to and its level of importance: A (foundation of the environment), B (build contract), C (code
+// consistency) or D (repository hygiene). The level sets the severity of its results and the order in
+// which checks are listed. Within a level the order below is kept. Register new checks here.
+export const LEVELS = ['A', 'B', 'C', 'D'];
+export const SEVERITY = { A: 'critical', B: 'high', C: 'medium', D: 'low' };
+
+/** Most important level first; checks of the same level keep the order they were given in. */
+export const sortByLevel = (list) => [...list].sort((a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level));
+
+const checks = sortByLevel([
   lockfile,
-  packageMetadata,
+  nodeVersion,
   dependencies,
-  gitignore,
+  packageScripts,
   typescriptStrict,
   ciWorkflow,
   readme,
   license,
-];
+  gitignore,
+  packageMetadata,
+  editorconfig,
+]);
 
-// Stack profiles extend the previous level: core < node < angular.
-const LEVELS = {
+// Stack profiles extend the previous one: core < node < angular.
+const PROFILE_INCLUDES = {
   core: ['core'],
   node: ['core', 'node'],
   angular: ['core', 'node', 'angular'],
 };
 
 export const profiles = Object.fromEntries(
-  Object.entries(LEVELS).map(([name, levels]) => [name, checks.filter((check) => levels.includes(check.profile))]),
+  Object.entries(PROFILE_INCLUDES).map(([name, included]) => [name, checks.filter((check) => included.includes(check.profile))]),
 );
 
 // Profiles whose checks all read package.json. Without it they would fail one by one for a single cause.
@@ -51,11 +59,11 @@ export function runAudit(profile, ctx) {
         id: 'config/project',
         title: 'Carpeta del proyecto',
         status: 'fail',
-        severity: 'high',
+        severity: SEVERITY.A,
         message: `No hay package.json en ${ctx.cwd}: no parece un proyecto ${profile}.`,
         fix: 'Revisa "path" y "profile" de este proyecto en .miyr.json.',
       },
     ];
   }
-  return selected.map((check) => check.run(ctx));
+  return selected.map((check) => ({ ...check.run(ctx), severity: SEVERITY[check.level] }));
 }

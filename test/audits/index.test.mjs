@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { profiles, runAudit } from '../../src/audits/index.mjs';
+import { LEVELS, SEVERITY, profiles, runAudit, sortByLevel } from '../../src/audits/index.mjs';
 import { completeProject, project } from '../../test-support/project.mjs';
 
 const ids = (profile) => profiles[profile].map((check) => check.id);
@@ -73,4 +73,58 @@ test('core projects do not need a package.json', () => {
 test('the package.json precheck does not stop projects that have one', () => {
   const results = runAudit('node', { cwd: project({ 'package.json': {} }) });
   assert.equal(results.length, profiles.node.length);
+});
+
+const levelOf = (id) => profiles.angular.find((check) => check.id === id).level;
+
+test('every check declares one of the levels A to D', () => {
+  assert.deepEqual(LEVELS, ['A', 'B', 'C', 'D']);
+  for (const check of profiles.angular) assert.ok(LEVELS.includes(check.level), check.id);
+});
+
+test('severity is derived from the level: A critical, B high, C medium, D low', () => {
+  assert.deepEqual(SEVERITY, { A: 'critical', B: 'high', C: 'medium', D: 'low' });
+});
+
+test('every result carries the severity of its check level, whether it passes or not', () => {
+  const cwd = completeProject({ 'package-lock.json': null, '.editorconfig': null });
+  const results = runAudit('angular', { cwd });
+  assert.ok(results.some((r) => r.status === 'fail') && results.some((r) => r.status === 'pass'));
+  for (const result of results) assert.equal(result.severity, SEVERITY[levelOf(result.id)], result.id);
+  const byId = Object.fromEntries(results.map((r) => [r.id, r]));
+  assert.equal(byId['config/lockfile'].severity, 'critical');
+  assert.equal(byId['config/editorconfig'].severity, 'low');
+});
+
+test('checks are listed from the most to the least important level', () => {
+  for (const name of Object.keys(profiles)) {
+    const order = profiles[name].map((check) => LEVELS.indexOf(check.level));
+    assert.deepEqual(order, [...order].sort((a, b) => a - b), name);
+  }
+});
+
+test('the configuration checks follow the agreed order of importance', () => {
+  const config = (name) => profiles[name].map((check) => check.id).filter((id) => id.startsWith('config/'));
+  assert.deepEqual(config('angular'), [
+    'config/lockfile',
+    'config/node-version',
+    'config/dependencies',
+    'config/package-scripts',
+    'config/gitignore',
+    'config/package-metadata',
+    'config/editorconfig',
+  ]);
+  assert.deepEqual(config('node'), config('angular'));
+  assert.deepEqual(config('core'), ['config/editorconfig']);
+});
+
+test('the missing package.json failure is critical', () => {
+  const [result] = runAudit('node', { cwd: project({}) });
+  assert.equal(result.severity, 'critical');
+});
+
+test('sortByLevel orders by level, keeps the given order inside a level and does not touch its input', () => {
+  const given = [{ id: 'd1', level: 'D' }, { id: 'a1', level: 'A' }, { id: 'b1', level: 'B' }, { id: 'a2', level: 'A' }];
+  assert.deepEqual(sortByLevel(given).map((c) => c.id), ['a1', 'a2', 'b1', 'd1']);
+  assert.deepEqual(given.map((c) => c.id), ['d1', 'a1', 'b1', 'a2']);
 });

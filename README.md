@@ -24,13 +24,13 @@ The menu and the list of options go to stderr, so stdout only ever carries the r
 
 A project of profile `node` or `angular` whose folder has no `package.json` gets a single failure (`config/project`) instead of one per check.
 
-Profiles extend each other: `core` < `node` < `angular`. Exit code `0` when every check passes, `1` when any check fails, `2` on invalid usage or an invalid manifest. Run `npm test` to execute the test suite.
+Profiles extend each other: `core` < `node` < `angular`. Exit code `0` when every check passes or is skipped, `1` when any check fails or errors, `2` on invalid usage or an invalid manifest. Run `npm test` to execute the test suite.
 
 Repository-level files are looked up to the repository root, which is the nearest folder with `.git` above the folder given. Project files (`package.json`, lockfile, `tsconfig.json`) are read from the project folder. Searched from the project folder up to the repository root, nearest first: `README`, `LICENSE`, `.editorconfig`, `.nvmrc`, and every `.gitignore` in the chain. Workflows are only read from `<root>/.github/workflows`, as GitHub does.
 
 ### Output
 
-The text report has one block per project, grouped by area (Configuración, Tipado, CI/CD, Documentación). Every check shows its status, its title and its stable id, so you can refer to it, for example `config/node-version`. Passing checks take a single line; failures always show the message, the evidence and the suggested fix. The last line is a `Resumen` with the totals.
+The text report has one block per project, grouped by area (Configuración, Tipado, CI/CD, Documentación). Every check shows its status, its title and its stable id, so you can refer to it, for example `config/node-version`. Passing checks take a single line; failures always show the message, the evidence and the suggested fix, and their severity in brackets (`[crítica]`, `[alta]`, `[media]` or `[baja]`). A `[SKIP]` check could not be verified (for example, it needs the network); it shows why, does not fail the run and is counted apart. The last line is a `Resumen` with the totals.
 
 | Option | Effect |
 |---|---|
@@ -61,18 +61,28 @@ Colors only wrap the text, so the report is the same once they are removed. Unkn
 
 ## Checks
 
-Checks are grouped by area. The ID prefix is the area, and the profile is the lowest level that runs the check.
+Checks are grouped by area. The ID prefix is the area, and the profile is the lowest profile that runs the check. Every check has a level that sets its severity and the order in which results are listed, most important first:
 
-| ID | Profile | What it verifies |
+| Level | Severity | Meaning |
 |---|---|---|
-| `config/editorconfig` | core | `.editorconfig` with `root = true` and the main keys in `[*]` |
-| `config/package-scripts` | node | `start`, `build`, `test` and `lint` scripts exist in `package.json` |
-| `config/node-version` | node | `engines.node`, a `.nvmrc` or `.node-version` file, and `packageManager` |
-| `config/lockfile` | node | A single lockfile, committed, consistent with `packageManager` |
-| `config/package-metadata` | node | `name`, semver `version`, `private` (apps) and a `license` that matches `LICENSE` |
-| `config/dependencies` | node | No `*`/`latest` ranges, no duplicates, no dev tooling in `dependencies` |
-| `config/gitignore` | node | `.gitignore` excludes `node_modules` |
-| `typing/typescript-strict` | angular | Effective `strict: true` without weakened flags |
-| `ci/workflow` | node | A workflow on `push` or `pull_request` that runs lint, test and build |
-| `docs/readme` | core | README sections for installation, usage, build and tests |
-| `docs/license` | core | A non-empty `LICENSE` file |
+| A | critical | Foundation of the environment: if it fails, nothing else is reliable |
+| B | high | Build contract |
+| C | medium | Code consistency |
+| D | low | Repository hygiene |
+
+The levels of `typing`, `ci` and `docs` checks are provisional until those areas are reviewed.
+
+| ID | Profile | Level | What it verifies |
+|---|---|---|---|
+| `config/project` | node | A | The project folder has a `package.json` (a single failure instead of one per check) |
+| `config/lockfile` | node | A | A single lockfile, committed, consistent with `packageManager` |
+| `config/node-version` | node | A | `engines.node`, a `.nvmrc` or `.node-version` file, and `packageManager` |
+| `config/dependencies` | node | A | No `*`/`latest` ranges, no duplicates, no dev tooling in `dependencies` |
+| `config/package-scripts` | node | B | `start`, `build`, `test` and `lint` scripts exist in `package.json` |
+| `typing/typescript-strict` | angular | B | Effective `strict: true` without weakened flags |
+| `ci/workflow` | node | B | A workflow on `push` or `pull_request` that runs lint, test and build |
+| `docs/readme` | core | C | README sections for installation, usage, build and tests |
+| `docs/license` | core | C | A non-empty `LICENSE` file |
+| `config/gitignore` | node | D | `.gitignore` excludes `node_modules` |
+| `config/package-metadata` | node | D | `name`, semver `version`, `private` (apps) and a `license` that matches `LICENSE` |
+| `config/editorconfig` | core | D | `.editorconfig` with `root = true` and the main keys in `[*]` |

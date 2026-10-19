@@ -3,6 +3,7 @@ import { loadPackage } from '../../lib/package-json.mjs';
 export const id = 'config/dependencies';
 export const title = 'Higiene de dependencias';
 export const profile = 'node';
+export const level = 'A';
 
 const SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies'];
 const LOOSE = new Set(['', '*', 'x', 'latest']);
@@ -11,7 +12,7 @@ const TOOLING = /^(eslint(-.+)?|@eslint\/.+|@typescript-eslint\/.+|typescript-es
 
 export function run({ cwd }) {
   const { pkg, failure } = loadPackage(cwd);
-  if (failure) return { id, title, severity: 'medium', ...failure };
+  if (failure) return { id, title, ...failure };
 
   const runtime = Object.keys(pkg.dependencies ?? {});
   const loose = [
@@ -33,11 +34,11 @@ export function run({ cwd }) {
 
   if (problems.length > 0) {
     return {
-      id, title, status: 'fail', severity: 'medium', evidence: { problems },
+      id, title, status: 'fail', evidence: { problems },
       message: problems.join('; ') + '.',
       fix: 'Acota los rangos, elimina duplicados y mueve las herramientas a devDependencies.',
     };
   }
 
-  return { id, title, status: 'pass', severity: 'medium', message: 'Dependencias sin rangos abiertos, duplicados ni herramientas mal ubicadas.' };
+  return { id, title, status: 'pass', message: 'Dependencias sin rangos abiertos, duplicados ni herramientas mal ubicadas.' };
 }

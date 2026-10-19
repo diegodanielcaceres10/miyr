@@ -4,6 +4,7 @@ import { readText } from '../../lib/files.mjs';
 export const id = 'docs/readme';
 export const title = 'README con secciones obligatorias';
 export const profile = 'core';
+export const level = 'C';
 
 // Headings are matched by stem so both Spanish and English titles are accepted.
 const SECTIONS = [
@@ -34,22 +35,22 @@ function headings(text) {
 export function run(ctx) {
   const file = findUp(ctx, ['README.md', 'README']);
   if (!file) {
-    return { id, title, status: 'fail', severity: 'medium', message: 'No se encontró README.md (ni en el proyecto ni en las carpetas hasta la raíz del repo).' };
+    return { id, title, status: 'fail', message: 'No se encontró README.md (ni en el proyecto ni en las carpetas hasta la raíz del repo).' };
   }
 
   const text = readText(file);
-  if (text.trim() === '') return { id, title, status: 'fail', severity: 'medium', message: 'El README está vacío.' };
+  if (text.trim() === '') return { id, title, status: 'fail', message: 'El README está vacío.' };
 
   const titles = headings(text);
   const missing = SECTIONS.filter(({ pattern }) => !titles.some((t) => pattern.test(t))).map(({ name }) => name);
 
   if (missing.length > 0) {
     return {
-      id, title, status: 'fail', severity: 'medium', evidence: { missing },
+      id, title, status: 'fail', evidence: { missing },
       message: `Al README le faltan secciones: ${missing.join(', ')}.`,
       fix: 'Añade un encabezado para cada sección faltante.',
     };
   }
 
-  return { id, title, status: 'pass', severity: 'medium', message: 'README con instalación, ejecución, build y pruebas.' };
+  return { id, title, status: 'pass', message: 'README con instalación, ejecución, build y pruebas.' };
 }

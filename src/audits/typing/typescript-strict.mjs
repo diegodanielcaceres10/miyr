@@ -5,6 +5,7 @@ import { effectiveOptions, loadTsconfigChain } from '../../lib/tsconfig.mjs';
 export const id = 'typing/typescript-strict';
 export const title = 'TypeScript strict mode habilitado';
 export const profile = 'angular';
+export const level = 'B';
 
 // Flags enabled by `strict: true` (each one can be overridden individually).
 const STRICT_FAMILY = [
@@ -24,14 +25,14 @@ export function run({ cwd }) {
   const entry = path.join(cwd, 'tsconfig.json');
 
   if (!fs.existsSync(entry)) {
-    return { id, title, status: 'fail', severity: 'high', message: 'No existe tsconfig.json en la raíz.' };
+    return { id, title, status: 'fail', message: 'No existe tsconfig.json en la raíz.' };
   }
 
   let options;
   try {
     options = effectiveOptions(loadTsconfigChain(entry));
   } catch (err) {
-    return { id, title, status: 'error', severity: 'high', message: `tsconfig.json inválido: ${err.message}` };
+    return { id, title, status: 'error', message: `tsconfig.json inválido: ${err.message}` };
   }
 
   const strict = options.strict?.value === true;
@@ -41,7 +42,7 @@ export function run({ cwd }) {
 
   if (!strict) {
     return {
-      id, title, status: 'fail', severity: 'high', evidence,
+      id, title, status: 'fail', evidence,
       message: 'compilerOptions.strict no es true.',
       fix: 'Añade "strict": true en compilerOptions de tsconfig.json.',
     };
@@ -52,11 +53,11 @@ export function run({ cwd }) {
   if (disabled.length > 0) {
     const weakened = disabled.map((flag) => `${flag}: false (${rel(cwd, options[flag].file)})`);
     return {
-      id, title, status: 'fail', severity: 'medium', evidence: { ...evidence, weakened },
+      id, title, status: 'fail', evidence: { ...evidence, weakened },
       message: `strict está en true pero se desactivan flags: ${disabled.join(', ')}.`,
       fix: 'Elimina esas sobrescrituras o justifícalas explícitamente.',
     };
   }
 
-  return { id, title, status: 'pass', severity: 'high', evidence, message: 'strict: true y sin flags debilitados.' };
+  return { id, title, status: 'pass', evidence, message: 'strict: true y sin flags debilitados.' };
 }

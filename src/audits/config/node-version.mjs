@@ -5,10 +5,11 @@ import { loadPackage } from '../../lib/package-json.mjs';
 export const id = 'config/node-version';
 export const title = 'Versión de Node y gestor de paquetes fijados';
 export const profile = 'node';
+export const level = 'A';
 
 export function run(ctx) {
   const { pkg, failure } = loadPackage(ctx.cwd);
-  if (failure) return { id, title, severity: 'medium', ...failure };
+  if (failure) return { id, title, ...failure };
 
   const missing = [];
   if (typeof pkg.engines?.node !== 'string' || pkg.engines.node.trim() === '') missing.push('engines.node');
@@ -20,11 +21,11 @@ export function run(ctx) {
 
   if (missing.length > 0) {
     return {
-      id, title, status: 'fail', severity: 'medium', evidence: { missing },
+      id, title, status: 'fail', evidence: { missing },
       message: `Falta: ${missing.join(', ')}.`,
       fix: 'Declara la versión de Node en "engines", un archivo .nvmrc y el gestor en "packageManager".',
     };
   }
 
-  return { id, title, status: 'pass', severity: 'medium', message: 'Node y gestor de paquetes fijados.' };
+  return { id, title, status: 'pass', message: 'Node y gestor de paquetes fijados.' };
 }
