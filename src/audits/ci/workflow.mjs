@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { baseFor, declareHint } from '../../lib/context.mjs';
 import { readText } from '../../lib/files.mjs';
 
 export const id = 'ci/workflow';
@@ -53,15 +54,18 @@ function runCommands(lines) {
   return commands;
 }
 
-// GitHub only reads workflows from the repository root, so that is the only place checked.
-export function run({ cwd, root = cwd }) {
-  const dir = path.join(root, '.github', 'workflows');
+// Workflows are read only from <base>/.github/workflows, with no climbing: that is where GitHub reads them.
+// The base is the project folder unless the manifest declares another one for "ci".
+export function run(ctx) {
+  const base = baseFor(ctx, 'ci');
+  const dir = path.join(base, '.github', 'workflows');
   const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.ya?ml$/i.test(f)) : [];
   if (files.length === 0) {
+    const where = base === path.resolve(ctx.cwd) ? 'la carpeta del proyecto' : ctx.root ? path.relative(path.resolve(ctx.root), base) || '.' : base;
     return {
       id, title, status: 'fail',
-      message: 'No hay workflows en .github/workflows de la raíz del repo.',
-      fix: 'Crea un workflow que se ejecute en push o pull_request y corra lint, test y build.',
+      message: `No hay workflows en .github/workflows de ${where}.`,
+      fix: `Crea un workflow que se ejecute en push o pull_request y corra lint, test y build. ${declareHint('ci')}`,
     };
   }
 

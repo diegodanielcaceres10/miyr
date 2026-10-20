@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { findUp } from '../../lib/context.mjs';
+import { declareHint, findUp, whereSearched } from '../../lib/context.mjs';
 import { readText } from '../../lib/files.mjs';
 
 export const id = 'config/editorconfig';
@@ -29,9 +29,13 @@ function parse(text) {
 }
 
 export function run(ctx) {
-  const file = findUp(ctx, ['.editorconfig']);
+  const file = findUp(ctx, 'editorconfig', ['.editorconfig']);
   if (!file) {
-    return { id, title, status: 'fail', message: 'No se encontró .editorconfig (ni en el proyecto ni en las carpetas hasta la raíz del repo).' };
+    return {
+      id, title, status: 'fail',
+      message: `No se encontró .editorconfig ${whereSearched(ctx, 'editorconfig')}.`,
+      fix: `Crea un .editorconfig. ${declareHint('editorconfig')}`,
+    };
   }
 
   const { root, sections } = parse(readText(file));

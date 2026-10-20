@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { profiles } from '../src/audits/index.mjs';
-import { EDITORCONFIG, MIT, README, completeProject, completeRepo, lockfile, nodeProjectFiles, project } from '../test-support/project.mjs';
+import { EDITORCONFIG, MIT, README, SHARED_AT_ROOT, WORKFLOW, completeProject, completeRepo, completeWebRepo, lockfile, nodeProjectFiles, project } from '../test-support/project.mjs';
 import { startRegistry } from '../test-support/registry.mjs';
 
 const bin = path.resolve('bin/miyr.mjs');
@@ -23,6 +23,7 @@ const cliAsync = (args, env = {}) =>
 
 const asProfile = (profile) => ({ projects: [{ path: '.', profile }] });
 const TWO = {
+  shared: SHARED_AT_ROOT,
   projects: [
     { name: 'web', path: 'web', profile: 'angular' },
     { name: 'landing', path: 'landing', profile: 'node' },
@@ -30,8 +31,8 @@ const TWO = {
 };
 const withManifest = (manifest, extra = {}) =>
   completeRepo({ '.miyr.json': manifest, ...nodeProjectFiles('landing'), ...extra });
-// A repo whose manifest sits INSIDE web/, which is where a run on that folder looks for it.
-const repoWithWebManifest = (overrides = {}) => completeRepo({ 'web/.miyr.json': asProfile('angular'), ...overrides });
+// A repo whose web/ folder holds everything, manifest included: what a run on that folder needs.
+const repoWithWebManifest = (overrides = {}) => completeWebRepo(overrides);
 const MANY = withManifest(TWO);
 
 // --- the profile of every project comes from the manifest
@@ -165,7 +166,12 @@ test('the manifest of the folder given is the one that counts, not the one at th
 
 test('a manifest in a subfolder of the repo resolves its paths from that subfolder', () => {
   const root = completeRepo({
-    'apps/.miyr.json': { projects: [{ name: 'site', path: 'site', profile: 'node' }] },
+    'apps/.miyr.json': { shared: SHARED_AT_ROOT, projects: [{ name: 'site', path: 'site', profile: 'node' }] },
+    'apps/.editorconfig': EDITORCONFIG,
+    'apps/README.md': README,
+    'apps/LICENSE': MIT,
+    'apps/.gitignore': 'node_modules\n',
+    'apps/.github/workflows/ci.yml': WORKFLOW,
     ...nodeProjectFiles('apps/site'),
   });
   const result = cli('audit', '--json', path.join(root, 'apps'));
@@ -174,7 +180,7 @@ test('a manifest in a subfolder of the repo resolves its paths from that subfold
 });
 
 test('a manifest written with comments and trailing commas is accepted', () => {
-  const text = '{\n  // projects\n  "projects": [\n    { "name": "web", "path": "web", "profile": "angular" },\n  ],\n}';
+  const text = '{\n  // projects\n  "shared": { "ci": ".", "license": ".", "readme": ".", "editorconfig": ".", "gitignore": ".", },\n  "projects": [\n    { "name": "web", "path": "web", "profile": "angular" },\n  ],\n}';
   assert.equal(cli('audit', completeRepo({ '.miyr.json': text })).status, 0);
 });
 
@@ -414,7 +420,7 @@ test('--online asks the registry once, however many Angular projects there are',
 test('--online makes no request when no selected project needs it', async () => {
   const registry = await startRegistry({});
   try {
-    const root = completeRepo({ '.miyr.json': { projects: [{ name: 'web', path: 'web', profile: 'node' }] } });
+    const root = completeRepo({ '.miyr.json': { shared: SHARED_AT_ROOT, projects: [{ name: 'web', path: 'web', profile: 'node' }] } });
     const result = await cliAsync(['audit', '--online', root], { MIYR_REGISTRY_URL: registry.url });
     assert.equal(result.status, 0, result.stdout);
     assert.deepEqual(registry.requests, []);
@@ -435,4 +441,59 @@ test('without --online the registry is never contacted', async () => {
 
 test('the usage text mentions --online', () => {
   assert.match(cli('audit', '--bogus').stderr, /--online/);
+});
+
+// --- shared and locations: what lives outside a project folder is declared in the manifest
+
+const WEB_ONLY = [{ name: 'web', path: 'web', profile: 'angular' }];
+const statusesOf = (stdout, name = 'web') => {
+  const { projects } = JSON.parse(stdout);
+  return Object.fromEntries(projects.find((p) => p.name === name).results.map((r) => [r.id, r.status]));
+};
+
+test('by default only the project folder is searched, so files kept at the repo root must be declared', () => {
+  const root = completeRepo({ '.miyr.json': { projects: WEB_ONLY } });
+  const result = cli('audit', '--json', root);
+  assert.equal(result.status, 1);
+  const statuses = statusesOf(result.stdout);
+  for (const id of ['docs/license', 'docs/readme', 'config/editorconfig', 'config/gitignore', 'ci/workflow']) {
+    assert.equal(statuses[id], 'fail', id);
+  }
+  assert.equal(statuses['config/lockfile'], 'pass', 'files inside the project folder are still found');
+});
+
+test('the failures tell where to declare the folder of what was not found', () => {
+  const { stdout } = cli('audit', completeRepo({ '.miyr.json': { projects: WEB_ONLY } }));
+  assert.match(stdout, /shared\.license/);
+  assert.match(stdout, /en la carpeta del proyecto/);
+});
+
+test('declaring the shared folders in the manifest makes the same repo pass', () => {
+  const root = completeRepo({ '.miyr.json': { shared: SHARED_AT_ROOT, projects: WEB_ONLY } });
+  assert.equal(cli('audit', root).status, 0);
+});
+
+test('a project can override a shared location with its own folder', () => {
+  const manifest = {
+    shared: SHARED_AT_ROOT,
+    projects: [...WEB_ONLY, { name: 'landing', path: 'landing', profile: 'node', locations: { license: 'landing' } }],
+  };
+  const root = completeRepo({ '.miyr.json': manifest, LICENSE: null, 'landing/LICENSE': MIT, ...nodeProjectFiles('landing') });
+  const result = cli('audit', '--all', '--json', root);
+  assert.equal(statusesOf(result.stdout, 'web')['docs/license'], 'fail');
+  assert.equal(statusesOf(result.stdout, 'landing')['docs/license'], 'pass');
+});
+
+test('an unknown kind in the manifest exits 2 and lists the valid ones', () => {
+  const result = cli('audit', completeRepo({ '.miyr.json': { shared: { licence: '.' }, projects: WEB_ONLY } }));
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /licence/);
+  assert.match(result.stderr, /node-version/);
+});
+
+test('a location that does not contain the project exits 2', () => {
+  const result = cli('audit', withManifest({ shared: { ci: 'landing' }, projects: TWO.projects }));
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /no contiene al proyecto/);
 });

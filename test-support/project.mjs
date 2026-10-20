@@ -111,12 +111,24 @@ export function nodeProjectFiles(dir) {
   );
 }
 
+// What a monorepo keeps at its root instead of inside each project.
+export const SHARED_AT_ROOT = { ci: '.', license: '.', readme: '.', editorconfig: '.', gitignore: '.' };
+
 /** A repository whose Angular project lives in `web/`. Override paths are relative to the repository root. */
 export function completeRepo(overrides = {}) {
   const files = {};
   for (const [name, content] of Object.entries(defaultFiles())) {
     files[PROJECT_LEVEL.includes(name) ? `web/${name}` : name] = content;
   }
-  files['.miyr.json'] = { projects: [{ name: 'web', path: 'web', profile: 'angular' }] };
+  files['.miyr.json'] = { shared: SHARED_AT_ROOT, projects: [{ name: 'web', path: 'web', profile: 'angular' }] };
+  return project(withOverrides(files, overrides));
+}
+
+/** A repository whose web/ folder holds everything, with its own manifest; the root only has .git. */
+export function completeWebRepo(overrides = {}) {
+  const files = { '.git/HEAD': 'ref: refs/heads/main\n' };
+  for (const [name, content] of Object.entries(defaultFiles())) {
+    if (name !== '.git/HEAD') files[`web/${name}`] = content;
+  }
   return project(withOverrides(files, overrides));
 }

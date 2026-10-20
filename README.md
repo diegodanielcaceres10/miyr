@@ -26,7 +26,7 @@ A project of profile `node` or `angular` whose folder has no `package.json` gets
 
 Profiles extend each other: `core` < `node` < `angular`. Exit code `0` when every check passes or is skipped, `1` when any check fails or errors, `2` on invalid usage or an invalid manifest. Run `npm test` to execute the test suite.
 
-Repository-level files are looked up to the repository root, which is the nearest folder with `.git` above the folder given. Project files (`package.json`, lockfile, `tsconfig.json`) are read from the project folder. Searched from the project folder up to the repository root, nearest first: `README`, `LICENSE`, `.editorconfig`, `.nvmrc`, and every `.gitignore` in the chain. Workflows are only read from `<root>/.github/workflows`, as GitHub does.
+**What is searched, and where.** By default miyr reads only inside each project folder (`<manifest folder>/<path>`): nothing outside it is found. Files that live somewhere else, such as a `LICENSE`, a `.gitignore` or the workflows kept at the root of a monorepo, are declared in the manifest (see `shared` and `locations` below). A declared folder says how far up a search may go: from the project folder up to that folder, nearest file first, and never past it. Workflows are the exception to the climbing: they are read only from `<folder>/.github/workflows`, where GitHub reads them. When something is not found, the failure says where miyr looked and which keys to use to point it elsewhere.
 
 ### Network (`--online`)
 
@@ -65,6 +65,32 @@ Colors only wrap the text, so the report is the same once they are removed. Unkn
 - `name` is optional (defaults to the path) and is what `--project` receives. Names and folders must be unique.
 - Unknown keys are rejected, so a typo does not go unnoticed.
 - The file may contain comments and trailing commas, like a hand-written `tsconfig.json`.
+- `shared` and `locations` declare the folder where each kind of file lives when it is not inside the project folder (see below).
+
+### Where shared files live: `shared` and `locations`
+
+Each key is a kind of file and each value a folder, relative to the manifest folder. `shared` applies to every project; a project's own `locations` override it kind by kind.
+
+```json
+{
+  "shared": { "ci": ".", "license": ".", "gitignore": "." },
+  "projects": [
+    { "name": "web", "path": "web", "profile": "angular" },
+    { "name": "landing", "path": "landing", "profile": "node", "locations": { "readme": "landing" } }
+  ]
+}
+```
+
+| Key | What it points to |
+|---|---|
+| `ci` | The folder whose `.github/workflows` holds the workflows (not searched upwards) |
+| `license` | Where a `LICENSE` file may be found |
+| `readme` | Where a `README` may be found |
+| `editorconfig` | Where an `.editorconfig` may be found |
+| `gitignore` | The folder from which every `.gitignore` down to the project applies |
+| `node-version` | Where a `.nvmrc` or `.node-version` may be found |
+
+Each folder must exist, be inside the manifest folder and contain the project (it may be the project folder itself or any folder above it). Unknown keys are rejected and every problem is reported at once.
 
 ## Checks
 

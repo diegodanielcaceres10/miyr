@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { KINDS } from '../../src/lib/context.mjs';
 import { MANIFEST_FILE, loadManifest, missingManifestMessage } from '../../src/lib/manifest.mjs';
 import { project } from '../../test-support/project.mjs';
 
@@ -16,8 +17,8 @@ test('loads projects with explicit names', () => {
   const { projects, error } = load(root);
   assert.equal(error, undefined);
   assert.deepEqual(projects, [
-    { name: 'app', path: 'web', dir: path.join(root, 'web'), profile: 'angular' },
-    { name: 'site', path: 'landing', dir: path.join(root, 'landing'), profile: 'node' },
+    { name: 'app', path: 'web', dir: path.join(root, 'web'), profile: 'angular', locations: {} },
+    { name: 'site', path: 'landing', dir: path.join(root, 'landing'), profile: 'node', locations: {} },
   ]);
 });
 
@@ -142,4 +143,82 @@ test('accepts comments and trailing commas, like a hand-written tsconfig', () =>
 
 test('invalid JSON is still reported after the comments are ignored', () => {
   assert.match(load(repo('{ // c\n "projects": [ }')).error, /inválido/);
+});
+
+// --- shared and locations: where the files that live outside a project folder are
+
+const WEB = { name: 'web', path: 'web', profile: 'angular' };
+const LANDING = { name: 'landing', path: 'landing', profile: 'node' };
+
+test('shared locations apply to every project, as absolute folders', () => {
+  const root = repo({ shared: { ci: '.', license: '.' }, projects: [WEB, LANDING] });
+  const { projects, error } = load(root);
+  assert.equal(error, undefined);
+  for (const p of projects) assert.deepEqual(p.locations, { ci: root, license: root });
+});
+
+test('a project can override a shared location and add its own', () => {
+  const root = repo({ shared: { ci: '.', license: '.' }, projects: [{ ...WEB, locations: { license: 'web', readme: '.' } }, LANDING] });
+  const [web, landing] = load(root).projects;
+  assert.deepEqual(web.locations, { ci: root, license: path.join(root, 'web'), readme: root });
+  assert.deepEqual(landing.locations, { ci: root, license: root });
+});
+
+test('a location may be the project folder itself or any folder above it', () => {
+  const root = project({ 'apps/web/package.json': '{}', [MANIFEST_FILE]: JSON.stringify({ projects: [{ path: 'apps/web', profile: 'node', locations: { ci: 'apps/web', license: 'apps', readme: '.' } }] }) });
+  assert.equal(load(root).error, undefined);
+});
+
+test('every kind can be declared', () => {
+  const shared = Object.fromEntries(KINDS.map((kind) => [kind, '.']));
+  const { projects, error } = load(repo({ shared, projects: [WEB] }));
+  assert.equal(error, undefined);
+  assert.deepEqual(Object.keys(projects[0].locations), KINDS);
+});
+
+test('unknown kinds are rejected in shared and in locations, listing the valid ones', () => {
+  for (const manifest of [{ shared: { licence: '.' }, projects: [WEB] }, { projects: [{ ...WEB, locations: { licence: '.' } }] }]) {
+    const { error } = load(repo(manifest));
+    assert.match(error, /licence/);
+    for (const kind of KINDS) assert.match(error, new RegExp(kind));
+  }
+});
+
+test('shared and locations must be objects', () => {
+  for (const shared of [[], null, 'root', 5]) assert.match(load(repo({ shared, projects: [WEB] })).error, /shared/, JSON.stringify(shared));
+  assert.match(load(repo({ projects: [{ ...WEB, locations: [] }] })).error, /locations/);
+});
+
+test('a location must be an existing folder, relative to the manifest and inside it', () => {
+  const bad = [5, '', path.resolve('/'), '..', '../outside', 'missing', 'web/package.json'];
+  for (const value of bad) {
+    const { error } = load(repo({ shared: { ci: value }, projects: [WEB] }));
+    assert.ok(error, JSON.stringify(value));
+    assert.match(error, /shared\.ci/, JSON.stringify(value));
+  }
+});
+
+test('a location inside a project is reported with that project', () => {
+  const { error } = load(repo({ projects: [{ ...WEB, locations: { ci: 'missing' } }] }));
+  assert.match(error, /projects\[0\]\.locations\.ci/);
+});
+
+test('a location folder must contain the project', () => {
+  const { error } = load(repo({ shared: { ci: 'landing' }, projects: [WEB, LANDING] }));
+  assert.match(error, /ci/);
+  assert.match(error, /no contiene al proyecto/);
+  assert.match(error, /web/);
+  assert.doesNotMatch(error, /projects\[1\]/, 'landing is inside its own folder, so only web is wrong');
+});
+
+test('problems in shared and in projects are reported together', () => {
+  const { error } = load(repo({ shared: { licence: '.' }, projects: [{ path: 'missing', profile: 'cobol' }] }));
+  assert.match(error, /licence/);
+  assert.match(error, /missing/);
+  assert.match(error, /cobol/);
+});
+
+test('the example manifest of the README is accepted', () => {
+  const root = repo({ shared: { ci: '.', license: '.', gitignore: '.' }, projects: [WEB, { ...LANDING, locations: { readme: 'landing' } }] });
+  assert.equal(load(root).error, undefined);
 });

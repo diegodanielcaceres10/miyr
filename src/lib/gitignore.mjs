@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { ancestors } from './context.mjs';
+import { ancestors, baseFor } from './context.mjs';
 import { readText } from './files.mjs';
 
 function globSource(body) {
@@ -54,9 +54,9 @@ export function ignoreState(text, relPath) {
 
 export const isIgnored = (text, relPath) => ignoreState(text, relPath) === true;
 
-/** Existing .gitignore files from the repository root down to the project folder. */
+/** Existing .gitignore files from the folder declared for them (the project itself by default) down to the project. */
 export function gitignoreFiles(ctx) {
-  return ancestors(ctx)
+  return ancestors(ctx.cwd, baseFor(ctx, 'gitignore'))
     .reverse()
     .map((dir) => path.join(dir, '.gitignore'))
     .filter((file) => fs.existsSync(file));

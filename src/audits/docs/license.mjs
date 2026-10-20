@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { findUp } from '../../lib/context.mjs';
+import { declareHint, findUp, whereSearched } from '../../lib/context.mjs';
 import { LICENSE_FILES, readText } from '../../lib/files.mjs';
 
 export const id = 'docs/license';
@@ -8,12 +8,12 @@ export const profile = 'core';
 export const level = 'C';
 
 export function run(ctx) {
-  const file = findUp(ctx, LICENSE_FILES);
+  const file = findUp(ctx, 'license', LICENSE_FILES);
   if (!file) {
     return {
       id, title, status: 'fail',
-      message: 'No se encontró un archivo LICENSE (ni en el proyecto ni en las carpetas hasta la raíz del repo).',
-      fix: 'Añade un archivo LICENSE con la licencia elegida.',
+      message: `No se encontró un archivo LICENSE ${whereSearched(ctx, 'license')}.`,
+      fix: `Añade un archivo LICENSE con la licencia elegida. ${declareHint('license')}`,
     };
   }
   if (readText(file).trim() === '') {

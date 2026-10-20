@@ -1,65 +1,80 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { ancestors, findRepoRoot, findUp, makeContext } from '../../src/lib/context.mjs';
+import { KINDS, ancestors, baseFor, declareHint, findUp, whereSearched } from '../../src/lib/context.mjs';
 import { project } from '../../test-support/project.mjs';
 
-test('findRepoRoot returns the nearest ancestor that contains .git', () => {
-  const root = project({ '.git/HEAD': 'x', 'a/b/file.txt': '' });
-  assert.equal(findRepoRoot(path.join(root, 'a', 'b')), root);
+test('lists the kinds of file whose location can be declared', () => {
+  assert.deepEqual(KINDS, ['ci', 'license', 'readme', 'editorconfig', 'gitignore', 'node-version']);
 });
 
-test('findRepoRoot accepts .git as a file (worktrees, submodules)', () => {
-  const root = project({ '.git': 'gitdir: ../elsewhere', 'a/file.txt': '' });
-  assert.equal(findRepoRoot(path.join(root, 'a')), root);
+test('the base folder of a kind is the project folder unless a location is declared', () => {
+  const ctx = { cwd: '/work/nura/web', locations: { license: '/work/nura' } };
+  assert.equal(baseFor(ctx, 'license'), path.resolve('/work/nura'));
+  assert.equal(baseFor(ctx, 'readme'), path.resolve('/work/nura/web'));
+  assert.equal(baseFor({ cwd: '/work/nura/web' }, 'license'), path.resolve('/work/nura/web'));
 });
 
-test('findRepoRoot does not climb past the limit', () => {
-  const outer = project({ '.git/HEAD': 'x', 'repo/a/file.txt': '' });
-  const repo = path.join(outer, 'repo');
-  assert.equal(findRepoRoot(path.join(repo, 'a'), { limit: repo }), null);
-  assert.equal(findRepoRoot(path.join(repo, 'a')), outer);
-});
-
-test('makeContext pairs the project folder with its repository root', () => {
-  const root = project({ '.git/HEAD': 'x', 'web/package.json': '{}' });
-  assert.deepEqual(makeContext(path.join(root, 'web')), { cwd: path.join(root, 'web'), root });
-});
-
-test('ancestors lists directories from the project up to the root, nearest first', () => {
+test('ancestors lists directories from the project up to the base, nearest first', () => {
   const root = project({ 'apps/web/file.txt': '' });
   const cwd = path.join(root, 'apps', 'web');
-  assert.deepEqual(ancestors({ cwd, root }), [cwd, path.join(root, 'apps'), root]);
+  assert.deepEqual(ancestors(cwd, root), [cwd, path.join(root, 'apps'), root]);
 });
 
-test('ancestors is just the project when the root is the project or unknown', () => {
+test('ancestors is just the project when the base is the project itself', () => {
   const root = project({});
-  assert.deepEqual(ancestors({ cwd: root, root }), [root]);
-  assert.deepEqual(ancestors({ cwd: root }), [root]);
+  assert.deepEqual(ancestors(root, root), [root]);
+  assert.deepEqual(ancestors(root), [root]);
 });
 
-test('ancestors ignores a root that is not an ancestor of the project', () => {
+test('ancestors ignores a base that is not above the project', () => {
   const a = project({});
   const b = project({});
-  assert.deepEqual(ancestors({ cwd: a, root: b }), [a]);
+  assert.deepEqual(ancestors(a, b), [a]);
 });
 
-test('findUp returns the nearest match', () => {
-  const root = project({ 'LICENSE': 'root', 'web/LICENSE': 'web' });
-  const found = findUp({ cwd: path.join(root, 'web'), root }, ['LICENSE']);
-  assert.equal(found, path.join(root, 'web', 'LICENSE'));
+test('findUp only looks in the project folder when no location is declared', () => {
+  const root = project({ LICENSE: 'root', 'web/package.json': '{}' });
+  assert.equal(findUp({ cwd: path.join(root, 'web') }, 'license', ['LICENSE']), null);
 });
 
-test('findUp climbs to the root but never past it', () => {
+test('findUp climbs to the declared base and returns the nearest match', () => {
+  const root = project({ LICENSE: 'root', 'web/LICENSE': 'web', 'web/src/index.ts': '' });
+  const web = path.join(root, 'web');
+  const ctx = { cwd: web, locations: { license: root } };
+  assert.equal(findUp(ctx, 'license', ['LICENSE']), path.join(web, 'LICENSE'));
+  const bare = project({ LICENSE: 'root', 'web/package.json': '{}' });
+  assert.equal(findUp({ cwd: path.join(bare, 'web'), locations: { license: bare } }, 'license', ['LICENSE']), path.join(bare, 'LICENSE'));
+});
+
+test('findUp never looks above the declared base', () => {
   const outer = project({ 'README.md': 'outside', 'repo/web/package.json': '{}' });
-  const root = path.join(outer, 'repo');
-  const ctx = { cwd: path.join(root, 'web'), root };
-  assert.equal(findUp(ctx, ['README.md']), null);
-  const inside = project({ 'README.md': 'root', 'web/package.json': '{}' });
-  assert.equal(findUp({ cwd: path.join(inside, 'web'), root: inside }, ['README.md']), path.join(inside, 'README.md'));
+  const repo = path.join(outer, 'repo');
+  assert.equal(findUp({ cwd: path.join(repo, 'web'), locations: { readme: repo } }, 'readme', ['README.md']), null);
 });
 
-test('findUp ignores case and works without a root', () => {
+test('each kind has its own base', () => {
+  const root = project({ LICENSE: 'root', 'README.md': 'root', 'web/package.json': '{}' });
+  const ctx = { cwd: path.join(root, 'web'), locations: { license: root } };
+  assert.ok(findUp(ctx, 'license', ['LICENSE']));
+  assert.equal(findUp(ctx, 'readme', ['README.md']), null);
+});
+
+test('findUp ignores case', () => {
   const dir = project({ 'readme.md': 'x' });
-  assert.equal(findUp({ cwd: dir }, ['README.md']), path.join(dir, 'readme.md'));
+  assert.equal(findUp({ cwd: dir }, 'readme', ['README.md']), path.join(dir, 'readme.md'));
+});
+
+test('whereSearched says the project folder, or how far up the search went', () => {
+  assert.equal(whereSearched({ cwd: '/w/nura/web' }, 'license'), 'en la carpeta del proyecto');
+  const ctx = { cwd: '/w/nura/web', root: '/w/nura', locations: { license: '/w/nura' } };
+  assert.equal(whereSearched(ctx, 'license'), 'en la carpeta del proyecto ni en las superiores hasta .');
+  const deeper = { cwd: '/w/nura/apps/web', root: '/w/nura', locations: { license: '/w/nura/apps' } };
+  assert.equal(whereSearched(deeper, 'license'), `en la carpeta del proyecto ni en las superiores hasta ${path.join('apps')}`);
+});
+
+test('declareHint tells where to declare a location for that kind', () => {
+  const hint = declareHint('license');
+  assert.match(hint, /shared\.license/);
+  assert.match(hint, /locations\.license/);
 });

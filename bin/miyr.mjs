@@ -2,7 +2,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { latestPackagesFor, profiles, runAudit } from '../src/audits/index.mjs';
-import { findRepoRoot } from '../src/lib/context.mjs';
 import { MANIFEST_FILE, loadManifest, missingManifestMessage } from '../src/lib/manifest.mjs';
 import { fetchLatest } from '../src/lib/registry.mjs';
 import { chooseProject } from '../src/prompt.mjs';
@@ -64,9 +63,9 @@ const folder = rest[0] ?? options.cwd;
 const start = path.resolve(folder ?? process.cwd());
 if (!isDirectory(start)) fail(`No existe la carpeta: ${start}`);
 
-// Repo-level files (README, LICENSE, workflows...) are searched up to the git root. The manifest is not:
-// it must be exactly in `start`, the folder given (or the current one).
-const root = findRepoRoot(start) ?? start;
+// The manifest must be exactly in `start`, the folder given (or the current one). Paths in it, and the
+// folders where shared files are searched, are all relative to it.
+const root = start;
 
 // Nothing is audited unless the folder given has a manifest of its own.
 if (!fs.existsSync(path.join(start, MANIFEST_FILE))) fail(missingManifestMessage(start));
@@ -100,7 +99,7 @@ const report = {
     name: t.name,
     path: t.path,
     profile: t.profile,
-    results: runAudit(t.profile, { cwd: t.dir, root, online, latest }),
+    results: runAudit(t.profile, { cwd: t.dir, root, locations: t.locations, online, latest }),
   })),
 };
 

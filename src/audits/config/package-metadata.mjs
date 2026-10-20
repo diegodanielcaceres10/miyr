@@ -39,7 +39,7 @@ export function run(ctx) {
   } else {
     const spdx = pkg.license.trim().replace(/-(?:only|or-later)$/, '').replace(/\+$/, '');
     const signature = SIGNATURES[spdx];
-    const file = findUp(ctx, LICENSE_FILES);
+    const file = findUp(ctx, 'license', LICENSE_FILES);
     if (signature && file && !signature.test(readText(file))) {
       problems.push(`license "${pkg.license}" no coincide con ${path.basename(file)}`);
     }

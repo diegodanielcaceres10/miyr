@@ -1,4 +1,4 @@
-import { findUp } from '../../lib/context.mjs';
+import { declareHint, findUp, whereSearched } from '../../lib/context.mjs';
 import { readText } from '../../lib/files.mjs';
 
 export const id = 'docs/readme';
@@ -33,9 +33,13 @@ function headings(text) {
 }
 
 export function run(ctx) {
-  const file = findUp(ctx, ['README.md', 'README']);
+  const file = findUp(ctx, 'readme', ['README.md', 'README']);
   if (!file) {
-    return { id, title, status: 'fail', message: 'No se encontró README.md (ni en el proyecto ni en las carpetas hasta la raíz del repo).' };
+    return {
+      id, title, status: 'fail',
+      message: `No se encontró README.md ${whereSearched(ctx, 'readme')}.`,
+      fix: `Crea un README.md. ${declareHint('readme')}`,
+    };
   }
 
   const text = readText(file);

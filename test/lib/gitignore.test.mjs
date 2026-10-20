@@ -58,7 +58,7 @@ test('ignoreState is null when no rule matches', () => {
   assert.equal(ignoreState('*.lock\n!yarn.lock\n', 'yarn.lock'), false);
 });
 
-const ctxAt = (root, sub = 'web') => ({ cwd: path.join(root, sub), root });
+const ctxAt = (root, sub = 'web') => ({ cwd: path.join(root, sub), root, locations: { gitignore: root } });
 
 test('isIgnoredInRepo reads the .gitignore of the repository root', () => {
   const root = project({ '.gitignore': 'node_modules\n', 'web/package.json': '{}' });
