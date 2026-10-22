@@ -17,7 +17,7 @@ const rooted = (root, folders) => Object.fromEntries(Object.entries(folders).map
 const ALL = { ci: '.', license: '.', readme: '.', editorconfig: '.', gitignore: '.' };
 const at = (overrides = {}, folders = {}) => {
   const root = completeRepo(overrides);
-  return { cwd: path.join(root, 'web'), root, locations: rooted(root, folders) };
+  return { cwd: path.join(root, 'web'), root, locations: rooted(root, folders), workflows: ['ci.yml'] };
 };
 const CHECKS = { ci: ciWorkflow, license, readme, editorconfig, gitignore };
 

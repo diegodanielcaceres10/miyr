@@ -222,3 +222,28 @@ test('the example manifest of the README is accepted', () => {
   const root = repo({ shared: { ci: '.', license: '.', gitignore: '.' }, projects: [WEB, { ...LANDING, locations: { readme: 'landing' } }] });
   assert.equal(load(root).error, undefined);
 });
+
+// --- workflows: which workflow files belong to a project
+
+test('a project may declare its workflows, kept as written', () => {
+  const root = repo({ projects: [{ ...WEB, workflows: ['ci_web.yml', 'deploy_web.yaml'] }, LANDING] });
+  const [web, landing] = load(root).projects;
+  assert.deepEqual(web.workflows, ['ci_web.yml', 'deploy_web.yaml']);
+  assert.equal('workflows' in landing, false, 'a project that declares none has no workflows key');
+});
+
+test('workflows must be a non-empty list of workflow file names', () => {
+  for (const workflows of ['ci.yml', {}, [], [5], [''], ['ci'], ['ci.txt'], ['.github/workflows/ci.yml'], ['sub/ci.yml'], ['sub\\ci.yml']]) {
+    const { error } = load(repo({ projects: [{ ...WEB, workflows }] }));
+    assert.match(error ?? '', /workflows/, JSON.stringify(workflows));
+  }
+});
+
+test('the same workflow cannot be listed twice, whatever its case', () => {
+  const { error } = load(repo({ projects: [{ ...WEB, workflows: ['ci.yml', 'CI.YML'] }] }));
+  assert.match(error, /repetido/);
+});
+
+test('a project may list the workflow of another one: the check, not the manifest, decides if it fits', () => {
+  assert.equal(load(repo({ projects: [{ ...WEB, workflows: ['ci_landing.yml'] }, { ...LANDING, workflows: ['ci_landing.yml'] }] })).error, undefined);
+});

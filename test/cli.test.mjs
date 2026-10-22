@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { profiles } from '../src/audits/index.mjs';
-import { EDITORCONFIG, MIT, README, SHARED_AT_ROOT, WORKFLOW, completeProject, completeRepo, completeWebRepo, lockfile, nodeProjectFiles, project } from '../test-support/project.mjs';
+import { EDITORCONFIG, MIT, README, SHARED_AT_ROOT, WORKFLOW, completeProject, completeRepo, completeWebRepo, lockfile, nodeProjectFiles, project, workflowFor } from '../test-support/project.mjs';
 import { startRegistry } from '../test-support/registry.mjs';
 
 const bin = path.resolve('bin/miyr.mjs');
@@ -25,12 +25,19 @@ const asProfile = (profile) => ({ projects: [{ path: '.', profile }] });
 const TWO = {
   shared: SHARED_AT_ROOT,
   projects: [
-    { name: 'web', path: 'web', profile: 'angular' },
-    { name: 'landing', path: 'landing', profile: 'node' },
+    { name: 'web', path: 'web', profile: 'angular', workflows: ['ci_web.yml'] },
+    { name: 'landing', path: 'landing', profile: 'node', workflows: ['ci_landing.yml'] },
   ],
 };
+// Two projects sharing the CI kept at the root, each with the workflow that belongs to it.
 const withManifest = (manifest, extra = {}) =>
-  completeRepo({ '.miyr.json': manifest, ...nodeProjectFiles('landing'), ...extra });
+  completeRepo({
+    '.miyr.json': manifest,
+    ...nodeProjectFiles('landing'),
+    '.github/workflows/ci_web.yml': workflowFor('web'),
+    '.github/workflows/ci_landing.yml': workflowFor('landing'),
+    ...extra,
+  });
 // A repo whose web/ folder holds everything, manifest included: what a run on that folder needs.
 const repoWithWebManifest = (overrides = {}) => completeWebRepo(overrides);
 const MANY = withManifest(TWO);
@@ -496,4 +503,51 @@ test('a location that does not contain the project exits 2', () => {
   const result = cli('audit', withManifest({ shared: { ci: 'landing' }, projects: TWO.projects }));
   assert.equal(result.status, 2);
   assert.match(result.stderr, /no contiene al proyecto/);
+});
+
+// --- which workflows belong to which project
+
+const ciResult = (stdout, name) => JSON.parse(stdout).projects.find((p) => p.name === name).results.find((r) => r.id === 'ci/workflow');
+const PLAIN = TWO.projects.map(({ workflows: _omit, ...rest }) => rest);
+
+test('each project is checked against the workflows it declares', () => {
+  const { stdout } = cli('audit', '--all', '--json', MANY);
+  assert.equal(ciResult(stdout, 'web').status, 'pass');
+  assert.equal(ciResult(stdout, 'landing').status, 'pass');
+});
+
+test('a shared CI whose workflows are not declared shows as SKIP and does not fail the run', () => {
+  const root = withManifest({ shared: SHARED_AT_ROOT, projects: PLAIN });
+  const result = cli('audit', '--all', root);
+  assert.equal(result.status, 0, result.stdout);
+  assert.match(result.stdout, /\[SKIP\] Workflow de CI con lint, test y build \(ci\/workflow\)/);
+  assert.match(result.stdout, /"workflows"/);
+});
+
+test('a project cannot borrow the workflow of another one', () => {
+  const manifest = { shared: SHARED_AT_ROOT, projects: [{ ...TWO.projects[0], workflows: ['ci_landing.yml'] }, TWO.projects[1]] };
+  const result = cli('audit', '--all', '--json', withManifest(manifest));
+  assert.equal(result.status, 1);
+  assert.equal(ciResult(result.stdout, 'web').status, 'fail');
+  assert.match(ciResult(result.stdout, 'web').message, /ci_landing\.yml no hace referencia a la carpeta web/);
+  assert.equal(ciResult(result.stdout, 'landing').status, 'pass');
+});
+
+test('a declared workflow that does not exist is reported by name', () => {
+  const manifest = { shared: SHARED_AT_ROOT, projects: [{ ...TWO.projects[0], workflows: ['missing.yml'] }] };
+  const { stdout } = cli('audit', '--json', withManifest(manifest));
+  assert.equal(ciResult(stdout, 'web').status, 'fail');
+  assert.match(ciResult(stdout, 'web').message, /missing\.yml/);
+});
+
+test('an invalid workflows entry in the manifest exits 2', () => {
+  const manifest = { shared: SHARED_AT_ROOT, projects: [{ ...TWO.projects[0], workflows: ['.github/workflows/ci_web.yml'] }] };
+  const result = cli('audit', withManifest(manifest));
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /workflows/);
+});
+
+test('a project that keeps its CI inside its own folder needs no declaration', () => {
+  const { projects } = JSON.parse(cli('audit', '--json', completeProject()).stdout);
+  assert.equal(projects[0].results.find((r) => r.id === 'ci/workflow').status, 'pass');
 });

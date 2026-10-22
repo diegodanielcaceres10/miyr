@@ -99,7 +99,7 @@ const report = {
     name: t.name,
     path: t.path,
     profile: t.profile,
-    results: runAudit(t.profile, { cwd: t.dir, root, locations: t.locations, online, latest }),
+    results: runAudit(t.profile, { cwd: t.dir, root, locations: t.locations, workflows: t.workflows, online, latest }),
   })),
 };
 

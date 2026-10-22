@@ -7,7 +7,8 @@ import { parseJsonc } from './jsonc.mjs';
 export const MANIFEST_FILE = '.miyr.json';
 
 const TOP_KEYS = ['projects', 'shared'];
-const PROJECT_KEYS = ['name', 'path', 'profile', 'locations'];
+const PROJECT_KEYS = ['name', 'path', 'profile', 'locations', 'workflows'];
+const WORKFLOW_FILE = /^[^/\\]+\.ya?ml$/i;
 const NAME = /^[\w./-]+$/;
 const posix = (p) => p.split(path.sep).join('/');
 const isOutside = (rel) => rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel);
@@ -132,6 +133,27 @@ export function loadManifest(dir, profileNames) {
     if (name !== null && names.has(name)) errors.push(`${where}: nombre repetido "${name}"`);
     if (name !== null) names.add(name);
 
+    // The workflow files of the shared CI that belong to this project (names only, no folders).
+    let workflows;
+    if (entry.workflows !== undefined) {
+      if (!Array.isArray(entry.workflows) || entry.workflows.length === 0) {
+        errors.push(`${where}: "workflows" debe ser una lista con al menos un archivo`);
+      } else {
+        const seen = new Set();
+        workflows = [];
+        for (const item of entry.workflows) {
+          if (typeof item !== 'string' || !WORKFLOW_FILE.test(item)) {
+            errors.push(`${where}: "workflows" solo admite nombres de archivo .yml o .yaml, sin carpetas (${JSON.stringify(item)})`);
+          } else if (seen.has(item.toLowerCase())) {
+            errors.push(`${where}: workflow repetido "${item}"`);
+          } else {
+            seen.add(item.toLowerCase());
+            workflows.push(item);
+          }
+        }
+      }
+    }
+
     // What this project declares overrides what is shared, kind by kind.
     const locations = { ...shared, ...readLocations(entry.locations, `${where}.locations`, dir, errors) };
     if (projectDir) {
@@ -143,7 +165,7 @@ export function loadManifest(dir, profileNames) {
     }
 
     if (projectDir && name !== null && profileNames.includes(entry.profile)) {
-      projects.push({ name, path: posix(rel) || '.', dir: projectDir, profile: entry.profile, locations });
+      projects.push({ name, path: posix(rel) || '.', dir: projectDir, profile: entry.profile, locations, ...(workflows ? { workflows } : {}) });
     }
   });
 

@@ -75,8 +75,8 @@ Each key is a kind of file and each value a folder, relative to the manifest fol
 {
   "shared": { "ci": ".", "license": ".", "gitignore": "." },
   "projects": [
-    { "name": "web", "path": "web", "profile": "angular" },
-    { "name": "landing", "path": "landing", "profile": "node", "locations": { "readme": "landing" } }
+    { "name": "web", "path": "web", "profile": "angular", "workflows": ["ci_web.yml"] },
+    { "name": "landing", "path": "landing", "profile": "node", "locations": { "readme": "landing" }, "workflows": ["ci_landing.yml"] }
   ]
 }
 ```
@@ -89,6 +89,17 @@ Each key is a kind of file and each value a folder, relative to the manifest fol
 | `editorconfig` | Where an `.editorconfig` may be found |
 | `gitignore` | The folder from which every `.gitignore` down to the project applies |
 | `node-version` | Where a `.nvmrc` or `.node-version` may be found |
+
+### Which workflows are a project's: `workflows`
+
+When the CI is shared (the `ci` folder is above the project) several projects use the same `.github/workflows`, and miyr cannot tell which workflow is whose by looking at the folder. Each project lists its own with `workflows`: file names only, inside `<ci folder>/.github/workflows`, with no folders.
+
+- **Declared:** only those files are evaluated. A declared file that does not exist is a failure. Together they must run lint, test and build on `push` or `pull_request`.
+- **They must belong to the project:** every declared workflow has to refer to the project folder, through a `paths:` filter, a `working-directory:` or a command (`cd`, `--prefix`, `-C`, `-w`, `--workspace`). A workflow that does not is a failure, so a project cannot pass on another one's workflow after a copy-paste. `paths-ignore` and commented-out lines do not count.
+- **Not declared, shared CI:** miyr cannot attribute any workflow, so the check shows `[SKIP]` and says what to declare. It is not approved by default.
+- **Not declared, CI inside the project folder:** nothing to attribute; every workflow there is the project's.
+
+The names are free; `ci_<project>.yml` for integration and `deploy_<project>.yml` for deployment is a convention that helps people reading the repo, but miyr relies on the declaration and on the content, never on the name.
 
 Each folder must exist, be inside the manifest folder and contain the project (it may be the project folder itself or any folder above it). Unknown keys are rejected and every problem is reported at once.
 
@@ -114,7 +125,7 @@ The levels of `typing`, `ci` and `docs` checks are provisional until those areas
 | `config/angular-version` | angular | B | `@angular/core` is on the same major as the latest stable (needs `--online`; otherwise skipped, showing the version found). Fails, naming both versions and how many majors behind (medium severity for one, high for two or more). Also fails when another `@angular/*` package is on a different major. Reads the version from `package-lock.json`, or the declared range if there is none |
 | `config/package-scripts` | node | B | `start`, `build`, `test` and `lint` scripts exist in `package.json` |
 | `typing/typescript-strict` | angular | B | Effective `strict: true` without weakened flags |
-| `ci/workflow` | node | B | A workflow on `push` or `pull_request` that runs lint, test and build |
+| `ci/workflow` | node | B | The project's workflows (all of those in its folder, or the ones it declares in `workflows` when the CI is shared) run lint, test and build on `push` or `pull_request`, and refer to the project folder when shared. Skipped when the CI is shared and nothing is declared |
 | `docs/readme` | core | C | README sections for installation, usage, build and tests |
 | `docs/license` | core | C | A non-empty `LICENSE` file |
 | `config/gitignore` | node | D | `.gitignore` excludes `node_modules` |

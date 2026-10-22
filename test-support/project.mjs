@@ -55,6 +55,25 @@ of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction.
 `;
 
+/** A CI workflow scoped to `folder`: triggered by changes in it and running its steps there. */
+export const workflowFor = (folder) => `name: CI ${folder}
+on:
+  push:
+    paths:
+      - '${folder}/**'
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${folder}
+    steps:
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+`;
+
 /** A package-lock.json (v3) that resolves the given package versions. */
 export function lockfile(versions = { '@angular/core': '22.2.1', '@angular/router': '22.2.1' }) {
   const packages = { '': { name: 'app', version: '0.0.0' } };
@@ -120,7 +139,8 @@ export function completeRepo(overrides = {}) {
   for (const [name, content] of Object.entries(defaultFiles())) {
     files[PROJECT_LEVEL.includes(name) ? `web/${name}` : name] = content;
   }
-  files['.miyr.json'] = { shared: SHARED_AT_ROOT, projects: [{ name: 'web', path: 'web', profile: 'angular' }] };
+  files['.github/workflows/ci.yml'] = workflowFor('web');
+  files['.miyr.json'] = { shared: SHARED_AT_ROOT, projects: [{ name: 'web', path: 'web', profile: 'angular', workflows: ['ci.yml'] }] };
   return project(withOverrides(files, overrides));
 }
 
