@@ -1,5 +1,6 @@
 import { lockedVersions } from '../../lib/lockfile-versions.mjs';
 import { loadPackage } from '../../lib/package-json.mjs';
+import { majorOf } from '../../lib/versions.mjs';
 
 export const id = 'config/angular-version';
 export const title = 'Angular en la última versión estable';
@@ -12,11 +13,6 @@ const CORE = '@angular/core';
 // Versioned on their own, so they are not compared with @angular/core.
 const INDEPENDENT = new Set(['@angular/fire']);
 
-// Major version of an exact version or of a range (its lower bound); null for tags, URLs or wildcards.
-const majorOf = (text) => {
-  const match = /^[\s^~>=<v]*(\d+)/.exec(String(text).trim());
-  return match ? Number(match[1]) : null;
-};
 const majors = (count) => (count === 1 ? '1 versión mayor' : `${count} versiones mayores`);
 
 export function run(ctx) {

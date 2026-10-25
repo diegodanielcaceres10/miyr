@@ -5,7 +5,7 @@ import { KINDS, ancestors, baseFor, declareHint, findUp, whereSearched } from '.
 import { project } from '../../test-support/project.mjs';
 
 test('lists the kinds of file whose location can be declared', () => {
-  assert.deepEqual(KINDS, ['ci', 'license', 'readme', 'editorconfig', 'gitignore', 'node-version']);
+  assert.deepEqual(KINDS, ['ci', 'license', 'readme', 'editorconfig', 'gitignore', 'node-version', 'eslint', 'prettier']);
 });
 
 test('the base folder of a kind is the project folder unless a location is declared', () => {

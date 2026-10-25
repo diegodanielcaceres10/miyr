@@ -46,6 +46,18 @@ jobs:
       - run: npm run build
 `;
 
+export const ESLINT_CONFIG = "import eslintConfigPrettier from 'eslint-config-prettier';\n\nexport default [eslintConfigPrettier];\n";
+
+export const ANGULAR_JSON = {
+  projects: {
+    app: {
+      projectType: 'application',
+      architect: { lint: { builder: '@angular-eslint/builder:lint' } },
+      schematics: { '@schematics/angular:component': { style: 'scss' } },
+    },
+  },
+};
+
 export const MIT = `MIT License
 
 Copyright (c) 2026
@@ -75,7 +87,7 @@ jobs:
 `;
 
 /** A package-lock.json (v3) that resolves the given package versions. */
-export function lockfile(versions = { '@angular/core': '22.2.1', '@angular/router': '22.2.1' }) {
+export function lockfile(versions = { '@angular/core': '22.2.1', '@angular/router': '22.2.1', eslint: '9.20.0' }) {
   const packages = { '': { name: 'app', version: '0.0.0' } };
   for (const [name, version] of Object.entries(versions)) packages[`node_modules/${name}`] = { version };
   return { name: 'app', version: '0.0.0', lockfileVersion: 3, packages };
@@ -92,7 +104,14 @@ function defaultFiles() {
       engines: { node: '>=20' },
       packageManager: 'npm@10.9.0',
       dependencies: { '@angular/core': '^22.0.0', '@angular/router': '^22.0.0' },
-      scripts: { start: 'ng serve', build: 'ng build', test: 'ng test', lint: 'ng lint' },
+      devDependencies: {
+        eslint: '^9.20.0',
+        'angular-eslint': '^20.0.0',
+        'typescript-eslint': '^8.0.0',
+        prettier: '^3.3.0',
+        'eslint-config-prettier': '^10.0.0',
+      },
+      scripts: { start: 'ng serve', build: 'ng build', test: 'ng test', lint: 'ng lint', format: 'prettier --write .' },
     },
     '.nvmrc': '22\n',
     'package-lock.json': lockfile(),
@@ -102,6 +121,9 @@ function defaultFiles() {
     LICENSE: MIT,
     '.github/workflows/ci.yml': WORKFLOW,
     'tsconfig.json': { compilerOptions: { strict: true } },
+    'eslint.config.js': ESLINT_CONFIG,
+    '.prettierrc': { printWidth: 150 },
+    'angular.json': ANGULAR_JSON,
     '.miyr.json': { projects: [{ path: '.', profile: 'angular' }] },
   };
 }
@@ -120,14 +142,21 @@ export function completeProject(overrides = {}) {
 }
 
 // Files that belong to the project folder; everything else lives at the repository root.
-const PROJECT_LEVEL = ['package.json', '.nvmrc', 'package-lock.json', 'tsconfig.json'];
+const PROJECT_LEVEL = ['package.json', '.nvmrc', 'package-lock.json', 'tsconfig.json', 'eslint.config.js', '.prettierrc', 'angular.json'];
 
 /** Project-level files of a node project (no tsconfig) placed under `dir`. */
 export function nodeProjectFiles(dir) {
   const files = defaultFiles();
-  return Object.fromEntries(
-    PROJECT_LEVEL.filter((name) => name !== 'tsconfig.json').map((name) => [`${dir}/${name}`, files[name]]),
-  );
+  const { '@angular/core': _core, '@angular/router': _router, ...dependencies } = files['package.json'].dependencies;
+  const { 'angular-eslint': _angularEslint, ...devDependencies } = files['package.json'].devDependencies;
+  const pkg = { ...files['package.json'], dependencies, devDependencies, scripts: { ...files['package.json'].scripts, lint: 'eslint .' } };
+  return {
+    [`${dir}/package.json`]: pkg,
+    [`${dir}/.nvmrc`]: files['.nvmrc'],
+    [`${dir}/package-lock.json`]: lockfile({ eslint: '9.20.0' }),
+    [`${dir}/eslint.config.js`]: files['eslint.config.js'],
+    [`${dir}/.prettierrc`]: files['.prettierrc'],
+  };
 }
 
 // What a monorepo keeps at its root instead of inside each project.

@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { declareHint, findUp, whereSearched } from '../../lib/context.mjs';
+import { parseEditorconfig } from '../../lib/editorconfig.mjs';
 import { readText } from '../../lib/files.mjs';
 
 export const id = 'config/editorconfig';
@@ -9,24 +10,6 @@ export const level = 'D';
 
 // Keys that must be set in the global [*] section.
 const REQUIRED_KEYS = ['indent_style', 'indent_size', 'end_of_line', 'charset', 'insert_final_newline'];
-
-function parse(text) {
-  const root = {};
-  const sections = {};
-  let current = root;
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#') || line.startsWith(';')) continue;
-    const section = line.match(/^\[(.+)\]$/);
-    if (section) {
-      current = sections[section[1]] ??= {};
-      continue;
-    }
-    const pair = line.match(/^([^=:]+?)\s*[=:]\s*(.*)$/);
-    if (pair) current[pair[1].trim().toLowerCase()] = pair[2].trim().toLowerCase();
-  }
-  return { root, sections };
-}
 
 export function run(ctx) {
   const file = findUp(ctx, 'editorconfig', ['.editorconfig']);
@@ -38,7 +21,7 @@ export function run(ctx) {
     };
   }
 
-  const { root, sections } = parse(readText(file));
+  const { root, sections } = parseEditorconfig(readText(file));
   const global = sections['*'] ?? {};
   const missing = [
     ...(root.root === 'true' ? [] : ['root = true']),

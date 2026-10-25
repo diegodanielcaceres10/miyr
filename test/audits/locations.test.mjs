@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import * as ciWorkflow from '../../src/audits/ci/workflow.mjs';
 import * as editorconfig from '../../src/audits/config/editorconfig.mjs';
+import * as eslint from '../../src/audits/config/eslint.mjs';
+import * as prettier from '../../src/audits/config/prettier.mjs';
 import * as gitignore from '../../src/audits/config/gitignore.mjs';
 import * as lockfile from '../../src/audits/config/lockfile.mjs';
 import * as nodeVersion from '../../src/audits/config/node-version.mjs';
@@ -10,7 +12,7 @@ import * as packageMetadata from '../../src/audits/config/package-metadata.mjs';
 import * as license from '../../src/audits/docs/license.mjs';
 import * as readme from '../../src/audits/docs/readme.mjs';
 import { runAudit } from '../../src/audits/index.mjs';
-import { WORKFLOW, completeRepo, project } from '../../test-support/project.mjs';
+import { ESLINT_CONFIG, WORKFLOW, completeRepo, project } from '../../test-support/project.mjs';
 
 // The project lives in web/; the repository keeps its shared files at the root.
 const rooted = (root, folders) => Object.fromEntries(Object.entries(folders).map(([kind, folder]) => [kind, path.resolve(root, folder)]));
@@ -125,4 +127,26 @@ test('node-version tells where to declare the version file only when it is the m
   assert.match(missingFile.fix, /node-version/);
   const missingEngines = nodeVersion.run(at({ 'web/package.json': { name: 'app', packageManager: 'npm@10.9.0' } }));
   assert.doesNotMatch(missingEngines.fix, /locations/);
+});
+
+test('eslint: a config kept at a declared folder applies to the project, otherwise it is not found', () => {
+  const overrides = { 'web/eslint.config.js': null, 'eslint.config.js': ESLINT_CONFIG };
+  assert.equal(eslint.run(at(overrides, { eslint: '.' })).status, 'pass');
+  const result = eslint.run(at(overrides));
+  assert.equal(result.status, 'fail');
+  assert.match(result.fix, /shared\.eslint/);
+});
+
+test('prettier: a config kept at a declared folder applies to the project, otherwise it is not found', () => {
+  const overrides = { 'web/.prettierrc': null, '.prettierrc': { printWidth: 150 } };
+  assert.equal(prettier.run(at(overrides, { prettier: '.' })).status, 'pass');
+  const result = prettier.run(at(overrides));
+  assert.equal(result.status, 'fail');
+  assert.match(result.fix, /shared\.prettier/);
+});
+
+test('prettier compares with the .editorconfig of its own folder', () => {
+  const overrides = { '.editorconfig': 'root = true\n[*]\nmax_line_length = 100\n' };
+  assert.equal(prettier.run(at(overrides, { editorconfig: '.' })).status, 'fail');
+  assert.equal(prettier.run(at(overrides)).status, 'pass');
 });

@@ -1,14 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as ciWorkflow from './ci/workflow.mjs';
+import * as angularDefaults from './config/angular-defaults.mjs';
 import * as angularVersion from './config/angular-version.mjs';
 import * as dependencies from './config/dependencies.mjs';
 import * as editorconfig from './config/editorconfig.mjs';
+import * as eslint from './config/eslint.mjs';
 import * as gitignore from './config/gitignore.mjs';
 import * as lockfile from './config/lockfile.mjs';
 import * as nodeVersion from './config/node-version.mjs';
 import * as packageMetadata from './config/package-metadata.mjs';
 import * as packageScripts from './config/package-scripts.mjs';
+import * as prettier from './config/prettier.mjs';
 import * as license from './docs/license.mjs';
 import * as readme from './docs/readme.mjs';
 import * as typescriptStrict from './typing/typescript-strict.mjs';
@@ -31,6 +34,9 @@ const checks = sortByLevel([
   packageScripts,
   typescriptStrict,
   ciWorkflow,
+  eslint,
+  prettier,
+  angularDefaults,
   readme,
   license,
   gitignore,

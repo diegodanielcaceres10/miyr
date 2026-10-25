@@ -2,7 +2,7 @@ import path from 'node:path';
 import { findFile } from './files.mjs';
 
 /** Kinds of file whose folder can be declared in the manifest (`shared` and per-project `locations`). */
-export const KINDS = ['ci', 'license', 'readme', 'editorconfig', 'gitignore', 'node-version'];
+export const KINDS = ['ci', 'license', 'readme', 'editorconfig', 'gitignore', 'node-version', 'eslint', 'prettier'];
 
 /**
  * How far up a kind of file may be searched: the folder declared for it in the manifest,

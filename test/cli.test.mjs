@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { profiles } from '../src/audits/index.mjs';
-import { EDITORCONFIG, MIT, README, SHARED_AT_ROOT, WORKFLOW, completeProject, completeRepo, completeWebRepo, lockfile, nodeProjectFiles, project, workflowFor } from '../test-support/project.mjs';
+import { EDITORCONFIG, ESLINT_CONFIG, MIT, README, SHARED_AT_ROOT, WORKFLOW, completeProject, completeRepo, completeWebRepo, lockfile, nodeProjectFiles, project, workflowFor } from '../test-support/project.mjs';
 import { startRegistry } from '../test-support/registry.mjs';
 
 const bin = path.resolve('bin/miyr.mjs');
@@ -550,4 +550,53 @@ test('an invalid workflows entry in the manifest exits 2', () => {
 test('a project that keeps its CI inside its own folder needs no declaration', () => {
   const { projects } = JSON.parse(cli('audit', '--json', completeProject()).stdout);
   assert.equal(projects[0].results.find((r) => r.id === 'ci/workflow').status, 'pass');
+});
+
+// --- ESLint, Prettier and the Angular defaults
+
+test('the configuration kept at the repo root is found once it is declared', () => {
+  const overrides = {
+    'web/eslint.config.js': null,
+    'web/.prettierrc': null,
+    'eslint.config.js': ESLINT_CONFIG,
+    '.prettierrc': { printWidth: 150 },
+  };
+  const without = cli('audit', '--json', completeRepo(overrides));
+  assert.equal(statusesOf(without.stdout)['config/eslint'], 'fail');
+  assert.equal(statusesOf(without.stdout)['config/prettier'], 'fail');
+  const manifest = { shared: { ...SHARED_AT_ROOT, eslint: '.', prettier: '.' }, projects: [{ name: 'web', path: 'web', profile: 'angular', workflows: ['ci.yml'] }] };
+  const declared = cli('audit', '--json', completeRepo({ ...overrides, '.miyr.json': manifest }));
+  assert.equal(declared.status, 0, declared.stdout);
+  assert.equal(statusesOf(declared.stdout)['config/eslint'], 'pass');
+  assert.equal(statusesOf(declared.stdout)['config/prettier'], 'pass');
+});
+
+test('a project that breaks the ESLint, Prettier and Angular conventions fails each of them', () => {
+  const root = completeRepo({
+    'web/eslint.config.js': null,
+    'web/.eslintrc.json': '{}',
+    'web/.prettierrc': { printWidth: 100 },
+    'web/angular.json': { projects: { app: { projectType: 'application', architect: { lint: { builder: '@angular-eslint/builder:lint' } }, schematics: { '@schematics/angular:component': { style: 'less' } } } } },
+  });
+  const result = cli('audit', '--json', root);
+  assert.equal(result.status, 1);
+  const statuses = statusesOf(result.stdout);
+  for (const id of ['config/eslint', 'config/prettier', 'config/angular-defaults']) assert.equal(statuses[id], 'fail', id);
+});
+
+test('the three checks are listed after the scripts and before the repository hygiene ones', () => {
+  const { stdout } = cli('audit', completeRepo({ 'web/.prettierrc': { printWidth: 100 } }));
+  const at = (id) => stdout.indexOf(`(${id})`);
+  assert.ok(at('config/package-scripts') < at('config/eslint'));
+  assert.ok(at('config/eslint') < at('config/prettier'));
+  assert.ok(at('config/prettier') < at('config/angular-defaults'));
+  assert.ok(at('config/angular-defaults') < at('config/gitignore'));
+});
+
+test('a node project is not asked for Angular conventions', () => {
+  const root = completeRepo({ '.miyr.json': { shared: SHARED_AT_ROOT, projects: [{ name: 'landing', path: 'landing', profile: 'node' }] }, ...nodeProjectFiles('landing') });
+  const statuses = statusesOf(cli('audit', '--json', root).stdout, 'landing');
+  assert.equal(statuses['config/eslint'], 'pass');
+  assert.equal(statuses['config/prettier'], 'pass');
+  assert.equal(statuses['config/angular-defaults'], undefined);
 });

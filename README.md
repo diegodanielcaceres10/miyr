@@ -89,6 +89,8 @@ Each key is a kind of file and each value a folder, relative to the manifest fol
 | `editorconfig` | Where an `.editorconfig` may be found |
 | `gitignore` | The folder from which every `.gitignore` down to the project applies |
 | `node-version` | Where a `.nvmrc` or `.node-version` may be found |
+| `eslint` | Where an `eslint.config.*` may be found |
+| `prettier` | Where a Prettier config (`.prettierrc*`, `prettier.config.*`) may be found |
 
 ### Which workflows are a project's: `workflows`
 
@@ -126,6 +128,9 @@ The levels of `typing`, `ci` and `docs` checks are provisional until those areas
 | `config/package-scripts` | node | B | `start`, `build`, `test` and `lint` scripts exist in `package.json` |
 | `typing/typescript-strict` | angular | B | Effective `strict: true` without weakened flags |
 | `ci/workflow` | node | B | The project's workflows (all of those in its folder, or the ones it declares in `workflows` when the CI is shared) run lint, test and build on `push` or `pull_request`, and refer to the project folder when shared. Skipped when the CI is shared and nothing is declared |
+| `config/eslint` | node | C | A flat `eslint.config.*` (the old `.eslintrc*` and `eslintConfig` are rejected), `eslint` 9 or later (from the lockfile, or the declared range), a `lint` script that runs `eslint` or `ng lint`; Angular projects also need `angular-eslint`, `typescript-eslint` and, with `ng lint`, a `lint` target using the angular-eslint builder in `angular.json` |
+| `config/prettier` | node | C | A Prettier config, `prettier` and `eslint-config-prettier` installed, a `format` script, and an effective `printWidth` of 150 (from the config or from `max_line_length` in `.editorconfig`; Prettier uses 80 by default). `printWidth`, `tabWidth`, `useTabs` and `endOfLine` must agree with `.editorconfig` when both declare them. `eslint-config-prettier` must be used by the ESLint config. A config written as code cannot be read (miyr never runs project code), so it is skipped |
+| `config/angular-defaults` | angular | C | In `angular.json`, for every application: the default component style is `scss` or `sass` (`css` only with `tailwindcss`), and standalone is the default for components, directives and pipes (explicit `standalone: true` is required before Angular 19, and `standalone: false` is always rejected) |
 | `docs/readme` | core | C | README sections for installation, usage, build and tests |
 | `docs/license` | core | C | A non-empty `LICENSE` file |
 | `config/gitignore` | node | D | `.gitignore` excludes `node_modules` |

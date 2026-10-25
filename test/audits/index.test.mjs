@@ -111,11 +111,14 @@ test('the configuration checks follow the agreed order of importance', () => {
     'config/dependencies',
     'config/angular-version',
     'config/package-scripts',
+    'config/eslint',
+    'config/prettier',
+    'config/angular-defaults',
     'config/gitignore',
     'config/package-metadata',
     'config/editorconfig',
   ]);
-  assert.deepEqual(config('node'), config('angular').filter((id) => id !== 'config/angular-version'));
+  assert.deepEqual(config('node'), config('angular').filter((id) => !['config/angular-version', 'config/angular-defaults'].includes(id)));
   assert.deepEqual(config('core'), ['config/editorconfig']);
 });
 
