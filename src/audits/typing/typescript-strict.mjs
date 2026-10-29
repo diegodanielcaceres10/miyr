@@ -25,7 +25,7 @@ export function run({ cwd }) {
   const entry = path.join(cwd, 'tsconfig.json');
 
   if (!fs.existsSync(entry)) {
-    return { id, title, status: 'fail', message: 'No existe tsconfig.json en la raíz.' };
+    return { id, title, status: 'fail', message: 'No existe tsconfig.json en la carpeta del proyecto.' };
   }
 
   let options;

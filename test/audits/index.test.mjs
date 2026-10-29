@@ -148,3 +148,19 @@ test('latestPackagesFor lists the packages whose latest version the profiles nee
   assert.deepEqual(latestPackagesFor(['node', 'core']), []);
   assert.deepEqual(latestPackagesFor([]), []);
 });
+
+test('the typing checks follow their levels: the strict ones first, the extra options after', () => {
+  const typing = profiles.angular.map((check) => check.id).filter((id) => id.startsWith('typing/'));
+  assert.deepEqual(typing, ['typing/typescript-strict', 'typing/tsconfig-inheritance', 'typing/angular-compiler', 'typing/typescript-extras']);
+  assert.equal(levelOf('typing/typescript-extras'), 'C');
+  assert.equal(levelOf('typing/angular-compiler'), 'B');
+});
+
+test('a node profile has no typing checks', () => {
+  assert.deepEqual(profiles.node.filter((check) => check.id.startsWith('typing/')), []);
+});
+
+test('inside level C the Angular defaults come before the extra TypeScript options, then the docs', () => {
+  const levelC = profiles.angular.filter((check) => check.level === 'C').map((check) => check.id);
+  assert.deepEqual(levelC, ['config/eslint', 'config/prettier', 'config/angular-defaults', 'typing/typescript-extras', 'docs/readme', 'docs/license']);
+});

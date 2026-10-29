@@ -46,6 +46,19 @@ jobs:
       - run: npm run build
 `;
 
+/** A tsconfig.json that satisfies every typing check. */
+export const TSCONFIG = {
+  compileOnSave: false,
+  compilerOptions: {
+    strict: true,
+    noImplicitOverride: true,
+    noImplicitReturns: true,
+    noFallthroughCasesInSwitch: true,
+    forceConsistentCasingInFileNames: true,
+  },
+  angularCompilerOptions: { strictInjectionParameters: true, strictInputAccessModifiers: true, strictTemplates: true },
+};
+
 export const ESLINT_CONFIG = "import eslintConfigPrettier from 'eslint-config-prettier';\n\nexport default [eslintConfigPrettier];\n";
 
 export const ANGULAR_JSON = {
@@ -120,7 +133,9 @@ function defaultFiles() {
     'README.md': README,
     LICENSE: MIT,
     '.github/workflows/ci.yml': WORKFLOW,
-    'tsconfig.json': { compilerOptions: { strict: true } },
+    'tsconfig.json': TSCONFIG,
+    'tsconfig.app.json': { extends: './tsconfig.json' },
+    'tsconfig.spec.json': { extends: './tsconfig.json' },
     'eslint.config.js': ESLINT_CONFIG,
     '.prettierrc': { printWidth: 150 },
     'angular.json': ANGULAR_JSON,
@@ -142,7 +157,7 @@ export function completeProject(overrides = {}) {
 }
 
 // Files that belong to the project folder; everything else lives at the repository root.
-const PROJECT_LEVEL = ['package.json', '.nvmrc', 'package-lock.json', 'tsconfig.json', 'eslint.config.js', '.prettierrc', 'angular.json'];
+const PROJECT_LEVEL = ['package.json', '.nvmrc', 'package-lock.json', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.spec.json', 'eslint.config.js', '.prettierrc', 'angular.json'];
 
 /** Project-level files of a node project (no tsconfig) placed under `dir`. */
 export function nodeProjectFiles(dir) {

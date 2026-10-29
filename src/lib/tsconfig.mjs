@@ -50,3 +50,14 @@ export function effectiveOptions(chain, section = 'compilerOptions') {
   }
   return result;
 }
+
+/** <cwd>/tsconfig.json with its extends chain, or why it cannot be read: { entry, chain } | { problem }. */
+export function loadRootTsconfig(cwd) {
+  const entry = path.join(cwd, 'tsconfig.json');
+  if (!fs.existsSync(entry)) return { problem: 'No existe tsconfig.json en la carpeta del proyecto' };
+  try {
+    return { entry, chain: loadTsconfigChain(entry) };
+  } catch (err) {
+    return { problem: `tsconfig.json inválido: ${err.message}` };
+  }
+}

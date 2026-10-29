@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { profiles } from '../src/audits/index.mjs';
-import { EDITORCONFIG, ESLINT_CONFIG, MIT, README, SHARED_AT_ROOT, WORKFLOW, completeProject, completeRepo, completeWebRepo, lockfile, nodeProjectFiles, project, workflowFor } from '../test-support/project.mjs';
+import { EDITORCONFIG, ESLINT_CONFIG, MIT, README, SHARED_AT_ROOT, TSCONFIG, WORKFLOW, completeProject, completeRepo, completeWebRepo, lockfile, nodeProjectFiles, project, workflowFor } from '../test-support/project.mjs';
 import { startRegistry } from '../test-support/registry.mjs';
 
 const bin = path.resolve('bin/miyr.mjs');
@@ -599,4 +599,42 @@ test('a node project is not asked for Angular conventions', () => {
   assert.equal(statuses['config/eslint'], 'pass');
   assert.equal(statuses['config/prettier'], 'pass');
   assert.equal(statuses['config/angular-defaults'], undefined);
+});
+
+// --- the typing area
+
+test('the typing checks pass on a project with a complete tsconfig', () => {
+  const statuses = statusesOf(cli('audit', '--json', completeRepo()).stdout);
+  for (const id of ['typing/typescript-strict', 'typing/tsconfig-inheritance', 'typing/angular-compiler', 'typing/typescript-extras']) {
+    assert.equal(statuses[id], 'pass', id);
+  }
+});
+
+test('an app config that does not extend the root one fails, with high severity', () => {
+  const root = completeRepo({ 'web/tsconfig.app.json': { compilerOptions: {} } });
+  const result = cli('audit', root);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /\(typing\/tsconfig-inheritance\) \[alta\]/);
+  assert.match(result.stdout, /tsconfig\.app\.json no extiende tsconfig\.json/);
+});
+
+test('missing Angular compiler flags fail with the flag named', () => {
+  const root = completeRepo({ 'web/tsconfig.json': { ...TSCONFIG, angularCompilerOptions: { strictTemplates: false } } });
+  const { stdout } = cli('audit', root);
+  assert.match(stdout, /\(typing\/angular-compiler\) \[alta\]/);
+  assert.match(stdout, /strictTemplates: false \(tsconfig\.json\)/);
+});
+
+test('missing extra TypeScript options fail with medium severity', () => {
+  const root = completeRepo({ 'web/tsconfig.json': { compilerOptions: { strict: true }, angularCompilerOptions: TSCONFIG.angularCompilerOptions } });
+  const { stdout } = cli('audit', root);
+  assert.match(stdout, /\(typing\/typescript-extras\) \[media\]/);
+  assert.match(stdout, /noImplicitOverride/);
+});
+
+test('a missing tsconfig.json is one failure, not four', () => {
+  const root = completeRepo({ 'web/tsconfig.json': null, 'web/tsconfig.app.json': null, 'web/tsconfig.spec.json': null });
+  const statuses = statusesOf(cli('audit', '--json', root).stdout);
+  assert.equal(statuses['typing/typescript-strict'], 'fail');
+  for (const id of ['typing/tsconfig-inheritance', 'typing/angular-compiler', 'typing/typescript-extras']) assert.equal(statuses[id], 'skip', id);
 });

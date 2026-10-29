@@ -14,6 +14,9 @@ import * as packageScripts from './config/package-scripts.mjs';
 import * as prettier from './config/prettier.mjs';
 import * as license from './docs/license.mjs';
 import * as readme from './docs/readme.mjs';
+import * as angularCompiler from './typing/angular-compiler.mjs';
+import * as tsconfigInheritance from './typing/tsconfig-inheritance.mjs';
+import * as typescriptExtras from './typing/typescript-extras.mjs';
 import * as typescriptStrict from './typing/typescript-strict.mjs';
 
 // Checks live in one folder per area (config, typing, ci, docs). Each one declares the profile it belongs
@@ -33,10 +36,13 @@ const checks = sortByLevel([
   angularVersion,
   packageScripts,
   typescriptStrict,
+  tsconfigInheritance,
+  angularCompiler,
   ciWorkflow,
   eslint,
   prettier,
   angularDefaults,
+  typescriptExtras,
   readme,
   license,
   gitignore,
